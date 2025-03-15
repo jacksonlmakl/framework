@@ -82,6 +82,8 @@ if config_path !=None:
 elif _db !=None:
     client = DuckClient(_db)
     conn = client.connect()
+else:
+    conn=None
 if config_path !=None:
     # Create table if not exists
     table = Table(
@@ -143,5 +145,5 @@ elif python_path:
     r=execute_python_file(python_path)
     print("Success: ",r)
 
-
-conn.close()
+if conn != None:
+    conn.close()
