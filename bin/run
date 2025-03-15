@@ -36,15 +36,15 @@ for ((i=0; i<$STEP_COUNT; i++)); do
     fi
     
     if yq -e ".steps[$i].database" "$CONFIG_FILE" > /dev/null 2>&1; then
-        DATABASE_NAME=$(yq -r ".steps[$i].database" "$CONFIG_FILE")
-        DATABASE_PART="DATABASE=${DATABASE_NAME}"
+        DATABASE=$(yq -r ".steps[$i].database" "$CONFIG_FILE")
+        DATABASE_PART="DATABASE=${DATABASE}"
     fi
     
     echo "-------------------------------------"
     echo "Executing step: $STEP_NAME"
     if [ -n "$TABLE_PART" ]; then echo "TABLE=$TABLE_PATH"; fi
     if [ -n "$EXECUTE_PART" ]; then echo "EXECUTE=$EXECUTE_PATH"; fi
-    if [ -n "$DATABASE_PART" ]; then echo "DATABASE=$DATABASE_NAME"; fi
+    if [ -n "$DATABASE_PART" ]; then echo "DATABASE=$DATABASE"; fi
     echo "-------------------------------------"
     
     # Construct the command
