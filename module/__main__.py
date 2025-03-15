@@ -84,15 +84,40 @@ if table.create(conn):
 path = os.environ.get('EXECUTE', None)
 
 # Determine if it's a data file or SQL file
-data_path = path if path and '.json' in path.lower() else None
+data_path = path if path and any(('.json' in path.lower(),'.csv' in path.lower(),'.parquet' in path.lower())) else None
 sql_path = path if path and '.sql' in path.lower() else None
 python_path = path if path and '.py' in path.lower() else None
 
 if data_path:
-    with open(data_path, 'r') as file:
-        data = json.load(file)
-    success, errors = table.insert(conn, data)
-    print(f"Inserted {success} rows, {errors} errors")
+    file_ext = os.path.splitext(data_path)[1].lower()
+    
+    if file_ext == '.json':
+        # Load JSON file
+        with open(data_path, 'r') as file:
+            data = json.load(file)
+    
+    elif file_ext == '.csv':
+        # Load CSV file
+        import pandas as pd
+        df = pd.read_csv(data_path)
+        data = df.to_dict(orient='records')
+    
+    elif file_ext == '.parquet':
+        # Load Parquet file
+        import pandas as pd
+        import pyarrow.parquet as pq
+        df = pd.read_parquet(data_path)
+        data = df.to_dict(orient='records')
+    
+    else:
+        print(f"Unsupported file format: {file_ext}")
+        data = []
+    
+    if data:
+        success, errors = table.insert(conn, data)
+        print(f"Inserted {success} rows, {errors} errors")
+    else:
+        print("No data to insert")
 elif sql_path:
     with open(sql_path, 'r') as file:
         sql_string = file.read()
