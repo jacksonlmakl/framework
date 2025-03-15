@@ -31,13 +31,11 @@ RUN apt-get update && \
     ln -s /usr/bin/python3 /usr/bin/python && \
     pip3 install --upgrade pip
 
-# Install yq (using the deb package instead of raw binary)
-RUN wget -qO yq_linux_amd64.deb https://github.com/mikefarah/yq/releases/download/v4.30.8/yq_linux_amd64.deb && \
-    dpkg -i yq_linux_amd64.deb && \
-    rm yq_linux_amd64.deb
+# Install yq using pip
+RUN pip install yq
 
 # Verify tools are working
-RUN yq --version && jq --version
+RUN jq --version && python -c "import yq; print('yq is installed')"
 
 # Set working directory
 WORKDIR /app
