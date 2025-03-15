@@ -1,4 +1,47 @@
 #!/bin/bash
-TABLE='model/config.json' EXECUTE='model/replicate.py' python module
-TABLE='model/config.json' EXECUTE='model/data.json' python module
-TABLE='model/config.json' EXECUTE='model/table.sql' python module
+
+# Check if yaml parser is installed
+if ! command -v yq &> /dev/null; then
+    echo "Error: yq is not installed. Please install it first."
+    echo "To install: pip install yq"
+    exit 1
+fi
+
+# Define the YAML config file
+CONFIG_FILE="controller.yaml"
+
+# Check if the config file exists
+if [ ! -f "$CONFIG_FILE" ]; then
+    echo "Error: Configuration file '$CONFIG_FILE' not found."
+    exit 1
+fi
+
+# Get the number of tasks
+TASK_COUNT=$(yq -r '.tasks | length' "$CONFIG_FILE")
+
+# Loop through each task
+for ((i=0; i<$TASK_COUNT; i++)); do
+    # Extract task details
+    TASK_NAME=$(yq -r .tasks[$i].name "$CONFIG_FILE")
+    TABLE_PATH=$(yq -r .tasks[$i].table "$CONFIG_FILE")
+    EXECUTE_PATH=$(yq -r .tasks[$i].execute "$CONFIG_FILE")
+    
+    echo "-------------------------------------"
+    echo "Executing task: $TASK_NAME"
+    echo "TABLE=$TABLE_PATH EXECUTE=$EXECUTE_PATH"
+    echo "-------------------------------------"
+    
+    # Run the command
+    TABLE="$TABLE_PATH" EXECUTE="$EXECUTE_PATH" python module
+    
+    # Check if the command was successful
+    if [ $? -eq 0 ]; then
+        echo "✅ Task completed successfully"
+    else
+        echo "❌ Task failed with error code $?"
+    fi
+    
+    echo ""
+done
+
+echo "All tasks completed!"
