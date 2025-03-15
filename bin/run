@@ -17,28 +17,51 @@ if [ ! -f "$CONFIG_FILE" ]; then
 fi
 
 # Get the number of steps
-TASK_COUNT=$(yq -r '.steps | length' "$CONFIG_FILE")
+STEP_COUNT=$(yq -r '.steps | length' "$CONFIG_FILE")
 
-# Loop through each task
-for ((i=0; i<$TASK_COUNT; i++)); do
-    # Extract task details
-    TASK_NAME=$(yq -r .steps[$i].name "$CONFIG_FILE")
-    TABLE_PATH=$(yq -r .steps[$i].table "$CONFIG_FILE")
-    EXECUTE_PATH=$(yq -r .steps[$i].execute "$CONFIG_FILE")
+# Loop through each step
+for ((i=0; i<$STEP_COUNT; i++)); do
+    # Extract step details
+    STEP_NAME=$(yq -r ".steps[$i].name" "$CONFIG_FILE")
+    
+    # Check if table and execute exist, set them as empty if they don't
+    if yq -e ".steps[$i].table" "$CONFIG_FILE" > /dev/null 2>&1; then
+        TABLE_PATH=$(yq -r ".steps[$i].table" "$CONFIG_FILE")
+        TABLE_ENV="TABLE=\"$TABLE_PATH\""
+    else
+        TABLE_ENV=""
+    fi
+    
+    if yq -e ".steps[$i].execute" "$CONFIG_FILE" > /dev/null 2>&1; then
+        EXECUTE_PATH=$(yq -r ".steps[$i].execute" "$CONFIG_FILE")
+        EXECUTE_ENV="EXECUTE=\"$EXECUTE_PATH\""
+    else
+        EXECUTE_ENV=""
+    fi
     
     echo "-------------------------------------"
-    echo "Executing task: $TASK_NAME"
-    echo "TABLE=$TABLE_PATH EXECUTE=$EXECUTE_PATH"
+    echo "Executing step: $STEP_NAME"
+    if [ -n "$TABLE_ENV" ]; then echo "TABLE=$TABLE_PATH"; fi
+    if [ -n "$EXECUTE_ENV" ]; then echo "EXECUTE=$EXECUTE_PATH"; fi
     echo "-------------------------------------"
     
-    # Run the command
-    TABLE="$TABLE_PATH" EXECUTE="$EXECUTE_PATH" python module
+    # Run the command with only the defined environment variables
+    if [ -n "$TABLE_ENV" ] && [ -n "$EXECUTE_ENV" ]; then
+        $TABLE_ENV $EXECUTE_ENV python module
+    elif [ -n "$TABLE_ENV" ]; then
+        $TABLE_ENV python module
+    elif [ -n "$EXECUTE_ENV" ]; then
+        $EXECUTE_ENV python module
+    else
+        echo "Warning: Neither TABLE nor EXECUTE defined for this step"
+        python module
+    fi
     
     # Check if the command was successful
     if [ $? -eq 0 ]; then
-        echo "✅ Task completed successfully"
+        echo "✅ Step completed successfully"
     else
-        echo "❌ Task failed with error code $?"
+        echo "❌ Step failed with error code $?"
     fi
     
     echo ""
