@@ -1,5 +1,5 @@
-from .table import Table
-from .duckdb import DuckClient
+from table import Table
+from duck_client import DuckClient
 import pandas as pd
 import json
 import os
