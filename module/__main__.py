@@ -76,11 +76,12 @@ python_path = path if path and '.py' in path.lower() else None
 print("**DEBUG ",python_path)
 # Establish client
 _db = os.environ.get('DATABASE', None)
-if _db == None or '.py' in str(python_path) and config_path !=None:
+if config_path !=None:
     client = DuckClient(config['database'])
-else:
+    conn = client.connect()
+elif _db !=None:
     client = DuckClient(_db)
-conn = client.connect()
+    conn = client.connect()
 if config_path !=None:
     # Create table if not exists
     table = Table(
