@@ -4,10 +4,7 @@ steps:
   - name: "Replicate Data"
     execute: "model/replicate.py"
     
-  - name: "Initialize Table"
-    table: "model/table.yaml"
-    
-  - name: "Insert Data Into Table"
+  - name: "Initialize Table & Insert Replication Data"
     table: "model/table.yaml"
     execute: "model/data.json"
   
