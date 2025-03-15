@@ -132,13 +132,15 @@ elif sql_path  and config_path != None:
         );
         """
         conn.execute(query)
+        print("Record Count", conn.execute(f'SELECT COUNT(*) FROM {config["name"]}').fetchall()[0][0])
 elif sql_path and _db != None:
     with open(sql_path, 'r') as file:
         sql_string = file.read()
-        conn.execute(sql_string)
+        _e=conn.execute(sql_string)
+        print("Result: ",_e.fetchall())
 elif python_path:
     r=execute_python_file(python_path)
     print("Success: ",r)
 
-print("Record Count", conn.execute(f'SELECT COUNT(*) FROM {config["name"]}').fetchall()[0][0])
+
 conn.close()
