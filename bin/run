@@ -16,15 +16,15 @@ if [ ! -f "$CONFIG_FILE" ]; then
     exit 1
 fi
 
-# Get the number of tasks
-TASK_COUNT=$(yq -r '.tasks | length' "$CONFIG_FILE")
+# Get the number of steps
+TASK_COUNT=$(yq -r '.steps | length' "$CONFIG_FILE")
 
 # Loop through each task
 for ((i=0; i<$TASK_COUNT; i++)); do
     # Extract task details
-    TASK_NAME=$(yq -r .tasks[$i].name "$CONFIG_FILE")
-    TABLE_PATH=$(yq -r .tasks[$i].table "$CONFIG_FILE")
-    EXECUTE_PATH=$(yq -r .tasks[$i].execute "$CONFIG_FILE")
+    TASK_NAME=$(yq -r .steps[$i].name "$CONFIG_FILE")
+    TABLE_PATH=$(yq -r .steps[$i].table "$CONFIG_FILE")
+    EXECUTE_PATH=$(yq -r .steps[$i].execute "$CONFIG_FILE")
     
     echo "-------------------------------------"
     echo "Executing task: $TASK_NAME"
@@ -44,4 +44,4 @@ for ((i=0; i<$TASK_COUNT; i++)); do
     echo ""
 done
 
-echo "All tasks completed!"
+echo "All steps completed!"
