@@ -6,6 +6,81 @@ import os
 import importlib.util
 import sys
 import yaml
+import duckdb
+import pandas as pd
+import os
+import pyarrow as pa
+import pyarrow.dataset as ds
+from pyiceberg.catalog import load_catalog
+from pyiceberg.schema import Schema
+from pyiceberg.types import (
+    NestedField, StringType, IntegerType, DoubleType, 
+    TimestampType, BooleanType, DecimalType, DateType
+)
+from pyiceberg.table import TableProperties
+from pyiceberg.partitioning import PartitionSpec
+
+def duckdb_to_iceberg(
+    duckdb_path, 
+    iceberg_dir, 
+    catalog_name="local_catalog",
+    warehouse_path=None
+):
+    """
+    Convert a DuckDB database file to Apache Iceberg tables in a directory.
+    
+    Args:
+        duckdb_path: Path to the DuckDB database file
+        iceberg_dir: Directory to store the Iceberg tables
+        catalog_name: Name for the Iceberg catalog
+        warehouse_path: Optional custom warehouse path
+    """
+    # Make sure the output directory exists
+    os.makedirs(iceberg_dir, exist_ok=True)
+    
+    if warehouse_path is None:
+        warehouse_path = os.path.join(iceberg_dir, "warehouse")
+    os.makedirs(warehouse_path, exist_ok=True)
+    
+    # Connect to the DuckDB database
+    conn = duckdb.connect(duckdb_path)
+    
+    # Get list of tables in the DuckDB database
+    tables = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table'"
+    ).fetchall()
+    tables = [table[0] for table in tables]
+    
+    print(f"Found {len(tables)} tables in DuckDB database: {', '.join(tables)}")
+    
+    # Use a simpler approach with PyArrow
+    for table_name in tables:
+        print(f"Processing table: {table_name}")
+        
+        # Fetch data from DuckDB
+        data_df = conn.execute(f"SELECT * FROM {table_name}").fetchdf()
+        
+        if len(data_df) > 0:
+            # Convert to PyArrow table
+            data_table = pa.Table.from_pandas(data_df)
+            
+            # Define output path
+            table_dir = os.path.join(warehouse_path, table_name)
+            os.makedirs(table_dir, exist_ok=True)
+            
+            # Write as Parquet file (closest to Iceberg without full catalog)
+            pq.write_table(
+                data_table, 
+                os.path.join(table_dir, f"{table_name}.parquet"),
+                compression='snappy'
+            )
+                
+            print(f"  - Wrote {len(data_df)} rows to {table_name}.parquet")
+        else:
+            print(f"  - Table {table_name} is empty")
+    
+    conn.close()
+    print("Conversion complete!")
 
 def execute_python_file(file_path):
     """
@@ -146,3 +221,7 @@ elif python_path:
 
 if conn != None:
     conn.close()
+    duckdb_to_iceberg(
+    duckdb_path=f"config['name'].duckdb",
+    iceberg_dir="./iceberg_tables"
+)
