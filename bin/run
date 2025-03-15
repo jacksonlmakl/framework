@@ -1,24 +1,19 @@
 #!/bin/bash
-
 # Check if yaml parser is installed
 if ! command -v yq &> /dev/null; then
     echo "Error: yq is not installed. Please install it first."
     echo "To install: pip install yq"
     exit 1
 fi
-
 # Define the YAML config file
 CONFIG_FILE="./controller.yaml"
-
 # Check if the config file exists
 if [ ! -f "$CONFIG_FILE" ]; then
     echo "Error: Configuration file '$CONFIG_FILE' not found."
     exit 1
 fi
-
 # Get the number of steps
 STEP_COUNT=$(yq -r '.steps | length' "$CONFIG_FILE")
-
 # Loop through each step
 for ((i=0; i<$STEP_COUNT; i++)); do
     # Extract step details
@@ -27,8 +22,9 @@ for ((i=0; i<$STEP_COUNT; i++)); do
     # Initialize environment variables command parts
     TABLE_PART=""
     EXECUTE_PART=""
+    DATABASE_PART=""
     
-    # Check if table and execute exist
+    # Check if table, execute, and database exist
     if yq -e ".steps[$i].table" "$CONFIG_FILE" > /dev/null 2>&1; then
         TABLE_PATH=$(yq -r ".steps[$i].table" "$CONFIG_FILE")
         TABLE_PART="TABLE=${TABLE_PATH}"
@@ -39,10 +35,16 @@ for ((i=0; i<$STEP_COUNT; i++)); do
         EXECUTE_PART="EXECUTE=${EXECUTE_PATH}"
     fi
     
+    if yq -e ".steps[$i].database" "$CONFIG_FILE" > /dev/null 2>&1; then
+        DATABASE_NAME=$(yq -r ".steps[$i].database" "$CONFIG_FILE")
+        DATABASE_PART="DATABASE=${DATABASE_NAME}"
+    fi
+    
     echo "-------------------------------------"
     echo "Executing step: $STEP_NAME"
     if [ -n "$TABLE_PART" ]; then echo "TABLE=$TABLE_PATH"; fi
     if [ -n "$EXECUTE_PART" ]; then echo "EXECUTE=$EXECUTE_PATH"; fi
+    if [ -n "$DATABASE_PART" ]; then echo "DATABASE=$DATABASE_NAME"; fi
     echo "-------------------------------------"
     
     # Construct the command
@@ -59,11 +61,19 @@ for ((i=0; i<$STEP_COUNT; i++)); do
         fi
     fi
     
+    if [ -n "$DATABASE_PART" ]; then
+        if [ -n "$CMD" ]; then
+            CMD="$CMD $DATABASE_PART"
+        else
+            CMD="$DATABASE_PART"
+        fi
+    fi
+    
     # Run the command
     if [ -n "$CMD" ]; then
         eval "$CMD python module"
     else
-        echo "Warning: Neither TABLE nor EXECUTE defined for this step"
+        echo "Warning: No parameters (TABLE, EXECUTE, DATABASE) defined for this step"
         python module
     fi
     
@@ -76,5 +86,4 @@ for ((i=0; i<$STEP_COUNT; i++)); do
     
     echo ""
 done
-
 echo "All steps completed!"
