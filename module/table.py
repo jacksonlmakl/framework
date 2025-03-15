@@ -1,4 +1,4 @@
-from .duck_client import DuckClient
+from duck_client import DuckClient
 class Table:
     def __init__(self, name, schema=[], primary_key=None, error_behavior='skip'):
         """
