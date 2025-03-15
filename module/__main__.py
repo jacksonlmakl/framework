@@ -10,6 +10,7 @@ import duckdb
 import pandas as pd
 import os
 import pyarrow as pa
+import pyarrow.parquet as pq
 import pyarrow.dataset as ds
 from pyiceberg.catalog import load_catalog
 from pyiceberg.schema import Schema
