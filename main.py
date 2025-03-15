@@ -50,7 +50,7 @@ conn.close()
 
 """
 python3 -m venv env && source env/bin/activate && pip install -r requirements.txt
-CONFIG_PATH='config.json' DATA_PATH='model/data.json' python main.py 
-CONFIG_PATH='config.json' DATA_PATH='model/table.sql' python main.py
+CONFIG_PATH='model/config.json' DATA_PATH='model/data.json' python main.py 
+CONFIG_PATH='model/config.json' DATA_PATH='model/table.sql' python main.py
 
 """
