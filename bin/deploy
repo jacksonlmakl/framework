@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# deploy.sh - Script to build Docker image for the framework
+# deploy.sh - Script to build Docker image for the framework and run as a scheduled service
 
 # Exit on error
 set -e
@@ -8,6 +8,7 @@ set -e
 # Set variables
 IMAGE_NAME="framework"
 IMAGE_TAG="latest"
+CONTAINER_NAME="framework-scheduler"
 
 echo "🔍 Checking environment..."
 
@@ -17,25 +18,22 @@ if [ ! -d "./bin" ] || [ ! -f "./bin/run" ]; then
     exit 1
 fi
 
-# Create Dockerfile with Ubuntu base (no credential issues)
-echo "📝 Creating Dockerfile with Ubuntu base image..."
+# Create Dockerfile with Ubuntu base that supports cron
+echo "📝 Creating Dockerfile with scheduling support..."
 cat > Dockerfile << 'EOL'
 FROM ubuntu:22.04
 
 # Set non-interactive mode for apt
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install Python and dependencies including jq
+# Install Python and dependencies including cron and jq
 RUN apt-get update && \
-    apt-get install -y python3 python3-pip wget curl jq && \
+    apt-get install -y python3 python3-pip wget curl jq cron && \
     ln -s /usr/bin/python3 /usr/bin/python && \
     pip3 install --upgrade pip
 
 # Install yq using pip
 RUN pip install yq
-
-# Verify tools are working
-RUN jq --version && python -c "import yq; print('yq is installed')"
 
 # Set working directory
 WORKDIR /app
@@ -52,30 +50,72 @@ COPY . .
 # Make run script executable
 RUN chmod +x ./bin/run
 
-# Set entry point to the run script
-ENTRYPOINT ["./bin/run"]
+# Create a wrapper script to run with logging
+RUN echo '#!/bin/bash\n\
+cd /app && ./bin/run --run >> /app/cron.log 2>&1\n\
+' > /app/run_scheduled.sh && chmod +x /app/run_scheduled.sh
+
+# Create entrypoint script to set up cron and keep container running
+RUN echo '#!/bin/bash\n\
+\n\
+# Extract schedule from controller.yaml if it exists\n\
+if command -v yq &> /dev/null && [ -f "/app/controller.yaml" ] && yq -e ".schedule" "/app/controller.yaml" > /dev/null 2>&1; then\n\
+    SCHEDULE=$(yq -r ".schedule" "/app/controller.yaml")\n\
+    echo "📅 Found schedule in controller.yaml: $SCHEDULE"\n\
+    \n\
+    # Create cron job\n\
+    echo "$SCHEDULE /app/run_scheduled.sh" > /etc/cron.d/framework-cron\n\
+    chmod 0644 /etc/cron.d/framework-cron\n\
+    crontab /etc/cron.d/framework-cron\n\
+    echo "✅ Cron job installed"\n\
+else\n\
+    echo "⚠️ No schedule found in controller.yaml, will run once now and then stay idle"\n\
+fi\n\
+\n\
+# Start cron service\n\
+service cron start\n\
+echo "✅ Cron service started"\n\
+\n\
+# Run once immediately\n\
+echo "🚀 Running initial execution..."\n\
+/app/run_scheduled.sh\n\
+\n\
+# Keep container running\n\
+echo "🔄 Container will remain running for scheduled executions"\n\
+tail -f /app/cron.log\n\
+' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
+
+# Set the entrypoint
+ENTRYPOINT ["/app/entrypoint.sh"]
 EOL
 
-# Build the Docker image with proper error handling
+# Build the Docker image
 echo "🔨 Building Docker image: $IMAGE_NAME:$IMAGE_TAG"
 if docker build -t $IMAGE_NAME:$IMAGE_TAG .; then
     echo "✅ Docker image built successfully!"
+    
+    # Stop and remove existing container if it exists
+    if docker ps -a | grep -q $CONTAINER_NAME; then
+        echo "🔄 Stopping and removing existing container..."
+        docker stop $CONTAINER_NAME || true
+        docker rm $CONTAINER_NAME || true
+    fi
+    
+    # Run the container with restart policy and volume mounts
+    echo "🚀 Starting container with auto-restart..."
+    docker run -d \
+        --name $CONTAINER_NAME \
+        --restart always \
+        -v $(pwd)/controller.yaml:/app/controller.yaml \
+        -v $(pwd)/model:/app/model \
+        -v $(pwd)/data:/app/data \
+        $IMAGE_NAME:$IMAGE_TAG
+    
     echo ""
-    echo "📋 Usage Instructions:"
-    echo "------------------------"
-    echo "To run the container with your configuration:"
-    echo "docker run -it --rm -v \$(pwd)/controller.yaml:/app/controller.yaml framework:latest"
-    echo ""
-    echo "To run with multiple paths mounted:"
-    echo "docker run -it --rm \\"
-    echo "  -v \$(pwd)/controller.yaml:/app/controller.yaml \\"
-    echo "  -v \$(pwd)/model:/app/model \\"
-    echo "  -v \$(pwd)/data:/app/data \\"
-    echo "  framework:latest"
+    echo "✅ Container is now running in the background with auto-restart"
+    echo "📋 Container logs can be viewed with: docker logs $CONTAINER_NAME"
+    echo "📊 To stop the container: docker stop $CONTAINER_NAME"
 else
     echo "❌ Docker image build failed."
     exit 1
 fi
-
-docker run -it --rm -v $(pwd)/controller.yaml:/app/controller.yaml framework:latest
-
