@@ -24,7 +24,7 @@ if table.create(conn):
     print("Table created successfully!")
 
 # Get the path from environment variable
-path = os.environ.get('PATH', None)
+path = os.environ.get('DATA_PATH', None)
 
 # Determine if it's a data file or SQL file
 data_path = path if path and '.json' in path.lower() else None
@@ -49,6 +49,7 @@ print("Record Count", conn.execute(f'SELECT COUNT(*) FROM {config["name"]}').fet
 conn.close()
 
 """
-CONFIG_PATH='config.json' PATH='data.json' python main.py && CONFIG_PATH='sql_config.json' PATH='table.sql' python main.py
+python3 -m venv env && source env/bin/activate && pip install -r requirements.txt
+CONFIG_PATH='config.json' DATA_PATH='data.json' python main.py && CONFIG_PATH='sql_config.json' DATA_PATH='table.sql' python main.py
 
 """
