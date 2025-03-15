@@ -61,7 +61,7 @@ def execute_python_file(file_path):
         return False
 
 # Load config file path from os
-config_path = os.environ.get('CONFIG_PATH')
+config_path = os.environ.get('TABLE')
 with open(config_path, 'r') as file:
     config = json.load(file)
     
@@ -80,7 +80,7 @@ if table.create(conn):
     print("Table created successfully!")
 
 # Get the path from environment variable
-path = os.environ.get('EXECUTE_PATH', None)
+path = os.environ.get('EXECUTE', None)
 
 # Determine if it's a data file or SQL file
 data_path = path if path and '.json' in path.lower() else None
@@ -110,8 +110,8 @@ conn.close()
 
 """
 python3 -m venv env && source env/bin/activate && pip install -r requirements.txt
-CONFIG_PATH='model/config.json' EXECUTE_PATH='model/replicate.py' python main.py 
-CONFIG_PATH='model/config.json' EXECUTE_PATH='model/data.json' python main.py 
-CONFIG_PATH='model/config.json' EXECUTE_PATH='model/table.sql' python main.py
+TABLE='model/config.json' EXECUTE='model/replicate.py' python main.py 
+TABLE='model/config.json' EXECUTE='model/data.json' python main.py 
+TABLE='model/config.json' EXECUTE='model/table.sql' python main.py
 
 """
