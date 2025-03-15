@@ -1,0 +1,14 @@
+tasks:
+  - name: "Run Replicate Model"
+    table: "model/config.json"
+    execute: "model/replicate.py"
+  
+  - name: "Process Data"
+    table: "model/config.json"
+    execute: "model/data.json"
+  
+  - name: "Execute SQL"
+    table: "model/config.json"
+    execute: "model/table.sql"
+  
+  # You can add more tasks here following the same pattern
