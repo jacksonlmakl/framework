@@ -1,4 +1,4 @@
 #!/bin/bash
-TABLE='model/config.json' EXECUTE='model/replicate.py' python main.py 
-TABLE='model/config.json' EXECUTE='model/data.json' python main.py 
-TABLE='model/config.json' EXECUTE='model/table.sql' python main.py
+TABLE='model/config.json' EXECUTE='model/replicate.py' python model/main.py 
+TABLE='model/config.json' EXECUTE='model/data.json' python model/main.py 
+TABLE='model/config.json' EXECUTE='model/table.sql' python model/main.py
