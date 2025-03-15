@@ -25,15 +25,19 @@ FROM ubuntu:22.04
 # Set non-interactive mode for apt
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install Python and dependencies
+# Install Python and dependencies including jq
 RUN apt-get update && \
-    apt-get install -y python3 python3-pip wget curl && \
+    apt-get install -y python3 python3-pip wget curl jq && \
     ln -s /usr/bin/python3 /usr/bin/python && \
     pip3 install --upgrade pip
 
-# Install yq
-RUN wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.30.8/yq_linux_amd64 && \
-    chmod +x /usr/local/bin/yq
+# Install yq (using the deb package instead of raw binary)
+RUN wget -qO yq_linux_amd64.deb https://github.com/mikefarah/yq/releases/download/v4.30.8/yq_linux_amd64.deb && \
+    dpkg -i yq_linux_amd64.deb && \
+    rm yq_linux_amd64.deb
+
+# Verify tools are working
+RUN yq --version && jq --version
 
 # Set working directory
 WORKDIR /app
@@ -62,14 +66,14 @@ if docker build -t $IMAGE_NAME:$IMAGE_TAG .; then
     echo "📋 Usage Instructions:"
     echo "------------------------"
     echo "To run the container with your configuration:"
-    echo "docker run -it --rm -v \$(pwd)/controller.yaml:/app/controller.yaml $IMAGE_NAME:$IMAGE_TAG"
+    echo "docker run -it --rm -v \$(pwd)/controller.yaml:/app/controller.yaml framework:latest"
     echo ""
     echo "To run with multiple paths mounted:"
     echo "docker run -it --rm \\"
     echo "  -v \$(pwd)/controller.yaml:/app/controller.yaml \\"
     echo "  -v \$(pwd)/model:/app/model \\"
     echo "  -v \$(pwd)/data:/app/data \\"
-    echo "  $IMAGE_NAME:$IMAGE_TAG"
+    echo "  framework:latest"
 else
     echo "❌ Docker image build failed."
     exit 1
