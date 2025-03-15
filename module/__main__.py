@@ -69,7 +69,7 @@ if config_path!=None:
     
 # Establish client
 _db = os.environ.get('DATABASE', None)
-if not _db:
+if _db == None:
     client = DuckClient(config['database'])
 else:
     client = DuckClient(_db)
