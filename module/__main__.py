@@ -66,10 +66,17 @@ config_path = os.environ.get('TABLE',None)
 if config_path!=None:
     with open(config_path, 'r') as file:
         config = yaml.safe_load(file)
-    
+# Get the path from environment variable
+path = os.environ.get('EXECUTE', None)
+
+# Determine if it's a data file or SQL file
+data_path = path if path and any(('.json' in path.lower(),'.csv' in path.lower(),'.parquet' in path.lower())) else None
+sql_path = path if path and '.sql' in path.lower() else None
+python_path = path if path and '.py' in path.lower() else None
+
 # Establish client
 _db = os.environ.get('DATABASE', None)
-if _db == None:
+if _db == None or python_path !=None:
     client = DuckClient(config['database'])
 else:
     client = DuckClient(_db)
@@ -85,13 +92,6 @@ if config_path !=None:
     if table.create(conn):
         print("Table created successfully!")
 
-# Get the path from environment variable
-path = os.environ.get('EXECUTE', None)
-
-# Determine if it's a data file or SQL file
-data_path = path if path and any(('.json' in path.lower(),'.csv' in path.lower(),'.parquet' in path.lower())) else None
-sql_path = path if path and '.sql' in path.lower() else None
-python_path = path if path and '.py' in path.lower() else None
 
 if data_path:
     file_ext = os.path.splitext(data_path)[1].lower()
