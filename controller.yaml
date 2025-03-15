@@ -12,4 +12,5 @@ steps:
     execute: "model/table.sql"
 
   - name: "Execute SQL"
+    database: "demo"
     execute: "model/test.sql"
