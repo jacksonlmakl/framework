@@ -3,11 +3,11 @@ steps:
     execute: "model/replicate.py"
   
   - name: "Process Data"
-    table: "model/config.yaml"
+    table: "model/table.yaml"
     execute: "model/data.json"
   
   - name: "Execute SQL"
-    table: "model/config.yaml"
+    table: "model/table.yaml"
     execute: "model/table.sql"
 
   - name: "Execute SQL"
