@@ -8,7 +8,7 @@ if ! command -v yq &> /dev/null; then
 fi
 
 # Define the YAML config file
-CONFIG_FILE="controller.yaml"
+CONFIG_FILE="./controller.yaml"
 
 # Check if the config file exists
 if [ ! -f "$CONFIG_FILE" ]; then
