@@ -68,7 +68,11 @@ if config_path!=None:
         config = yaml.safe_load(file)
     
 # Establish client
-client = DuckClient(config['database'])
+_db = os.environ.get('DATABASE', None)
+if not _db:
+    client = DuckClient(config['database'])
+else:
+    client = DuckClient(_db)
 conn = client.connect()
 if config_path !=None:
     # Create table if not exists
@@ -128,7 +132,7 @@ elif sql_path  and config_path != None:
         );
         """
         conn.execute(query)
-elif sql_path and config_path == None:
+elif sql_path and _db != None:
     with open(sql_path, 'r') as file:
         sql_string = file.read()
         conn.execute(sql_string)
@@ -138,11 +142,3 @@ elif python_path:
 
 print("Record Count", conn.execute(f'SELECT COUNT(*) FROM {config["name"]}').fetchall()[0][0])
 conn.close()
-
-"""
-python3 -m venv env && source env/bin/activate && pip install -r requirements.txt
-TABLE='model/config.json' EXECUTE='model/replicate.py' python main.py 
-TABLE='model/config.json' EXECUTE='model/data.json' python main.py 
-TABLE='model/config.json' EXECUTE='model/table.sql' python main.py
-
-"""
