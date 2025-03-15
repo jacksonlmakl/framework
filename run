@@ -1,4 +1,4 @@
 #!/bin/bash
-CONFIG_PATH='model/config.json' EXECUTE_PATH='model/replicate.py' python main.py 
-CONFIG_PATH='model/config.json' EXECUTE_PATH='model/data.json' python main.py 
-CONFIG_PATH='model/config.json' EXECUTE_PATH='model/table.sql' python main.py
+TABLE='model/config.json' EXECUTE='model/replicate.py' python main.py 
+TABLE='model/config.json' EXECUTE='model/data.json' python main.py 
+TABLE='model/config.json' EXECUTE='model/table.sql' python main.py
