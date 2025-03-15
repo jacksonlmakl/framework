@@ -62,23 +62,23 @@ def execute_python_file(file_path):
         return False
 
 # Load config file path from os
-config_path = os.environ.get('TABLE')
+config_path = os.environ.get('TABLE',None)
 with open(config_path, 'r') as file:
     config = yaml.safe_load(file)
     
 # Establish client
 client = DuckClient(config['database'])
 conn = client.connect()
-
-# Create table if not exists
-table = Table(
-    name=config["name"],
-    schema=config['schema_definition'],
-    primary_key=config["primary_key"],
-    error_behavior=config["error_behavior"]  # Try to convert invalid types
-)
-if table.create(conn):
-    print("Table created successfully!")
+if config_path !=None:
+    # Create table if not exists
+    table = Table(
+        name=config["name"],
+        schema=config['schema_definition'],
+        primary_key=config["primary_key"],
+        error_behavior=config["error_behavior"]  # Try to convert invalid types
+    )
+    if table.create(conn):
+        print("Table created successfully!")
 
 # Get the path from environment variable
 path = os.environ.get('EXECUTE', None)
@@ -118,7 +118,7 @@ if data_path:
         print(f"Inserted {success} rows, {errors} errors")
     else:
         print("No data to insert")
-elif sql_path:
+elif sql_path  and config_path != None:
     with open(sql_path, 'r') as file:
         sql_string = file.read()
         query = f"""
@@ -127,6 +127,10 @@ elif sql_path:
         );
         """
         conn.execute(query)
+elif sql_path and config_path == None:
+    with open(sql_path, 'r') as file:
+        sql_string = file.read()
+        conn.execute(sql_string)
 elif python_path:
     r=execute_python_file(python_path)
     print("Success: ",r)
