@@ -223,6 +223,6 @@ if conn != None:
     conn.close()
     if config_path !=None:
         duckdb_to_iceberg(
-        duckdb_path=f"{config['database']}.duckdb",
+        duckdb_path=f"./duckdb/{config['database']}.duckdb",
         iceberg_dir="./iceberg_tables"
     )
