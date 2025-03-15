@@ -5,6 +5,7 @@ import json
 import os
 import importlib.util
 import sys
+import yaml
 
 def execute_python_file(file_path):
     """
@@ -63,7 +64,7 @@ def execute_python_file(file_path):
 # Load config file path from os
 config_path = os.environ.get('TABLE')
 with open(config_path, 'r') as file:
-    config = json.load(file)
+    config = yaml.safe_load(file)
     
 # Establish client
 client = DuckClient(config['database'])
