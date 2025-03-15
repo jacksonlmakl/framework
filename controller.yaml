@@ -1,4 +1,4 @@
-tasks:
+steps:
   - name: "Run Replicate Model"
     table: "model/config.yaml"
     execute: "model/replicate.py"
@@ -11,4 +11,3 @@ tasks:
     table: "model/config.yaml"
     execute: "model/table.sql"
   
-  # You can add more tasks here following the same pattern
