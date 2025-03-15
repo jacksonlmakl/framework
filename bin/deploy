@@ -1,0 +1,76 @@
+#!/bin/bash
+
+# deploy.sh - Script to build Docker image for the framework
+
+# Exit on error
+set -e
+
+# Set variables
+IMAGE_NAME="framework"
+IMAGE_TAG="latest"
+
+echo "🔍 Checking environment..."
+
+# Check if we're in the repository root directory
+if [ ! -d "./bin" ] || [ ! -f "./bin/run" ]; then
+    echo "❌ Error: This script should be run from the repository root directory."
+    exit 1
+fi
+
+# Create Dockerfile with Ubuntu base (no credential issues)
+echo "📝 Creating Dockerfile with Ubuntu base image..."
+cat > Dockerfile << 'EOL'
+FROM ubuntu:22.04
+
+# Set non-interactive mode for apt
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install Python and dependencies
+RUN apt-get update && \
+    apt-get install -y python3 python3-pip wget curl && \
+    ln -s /usr/bin/python3 /usr/bin/python && \
+    pip3 install --upgrade pip
+
+# Install yq
+RUN wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.30.8/yq_linux_amd64 && \
+    chmod +x /usr/local/bin/yq
+
+# Set working directory
+WORKDIR /app
+
+# Copy requirements file
+COPY module/requirements.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the entire repository
+COPY . .
+
+# Make run script executable
+RUN chmod +x ./bin/run
+
+# Set entry point to the run script
+ENTRYPOINT ["./bin/run"]
+EOL
+
+# Build the Docker image with proper error handling
+echo "🔨 Building Docker image: $IMAGE_NAME:$IMAGE_TAG"
+if docker build -t $IMAGE_NAME:$IMAGE_TAG .; then
+    echo "✅ Docker image built successfully!"
+    echo ""
+    echo "📋 Usage Instructions:"
+    echo "------------------------"
+    echo "To run the container with your configuration:"
+    echo "docker run -it --rm -v \$(pwd)/controller.yaml:/app/controller.yaml $IMAGE_NAME:$IMAGE_TAG"
+    echo ""
+    echo "To run with multiple paths mounted:"
+    echo "docker run -it --rm \\"
+    echo "  -v \$(pwd)/controller.yaml:/app/controller.yaml \\"
+    echo "  -v \$(pwd)/model:/app/model \\"
+    echo "  -v \$(pwd)/data:/app/data \\"
+    echo "  $IMAGE_NAME:$IMAGE_TAG"
+else
+    echo "❌ Docker image build failed."
+    exit 1
+fi
