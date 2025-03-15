@@ -1,0 +1,14 @@
+{
+  "name": "customers", 
+  "database": "demo", 
+  "primary_key": "customer_id", 
+  "schema_definition": [
+    ["customer_id", "INTEGER"], 
+    ["name", "VARCHAR"], 
+    ["email", "VARCHAR"], 
+    ["signup_date", "DATE"], 
+    ["lifetime_value", "DECIMAL(10,2)"], 
+    ["is_active", "BOOLEAN"]
+  ], 
+  "error_behavior": "null"
+}
