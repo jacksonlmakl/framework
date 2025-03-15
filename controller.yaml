@@ -1,3 +1,5 @@
+schedule: "0 0 * * *"  # Run at midnight every day
+
 steps:
   - name: "Run Replicate Model"
     execute: "model/replicate.py"
