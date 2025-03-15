@@ -76,3 +76,6 @@ else
     echo "❌ Docker image build failed."
     exit 1
 fi
+
+docker run -it --rm -v $(pwd)/controller.yaml:/app/controller.yaml framework:latest
+
