@@ -63,8 +63,9 @@ def execute_python_file(file_path):
 
 # Load config file path from os
 config_path = os.environ.get('TABLE',None)
-with open(config_path, 'r') as file:
-    config = yaml.safe_load(file)
+if config_path!=None:
+    with open(config_path, 'r') as file:
+        config = yaml.safe_load(file)
     
 # Establish client
 client = DuckClient(config['database'])
