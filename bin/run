@@ -24,34 +24,44 @@ for ((i=0; i<$STEP_COUNT; i++)); do
     # Extract step details
     STEP_NAME=$(yq -r ".steps[$i].name" "$CONFIG_FILE")
     
-    # Check if table and execute exist, set them as empty if they don't
+    # Initialize environment variables command parts
+    TABLE_PART=""
+    EXECUTE_PART=""
+    
+    # Check if table and execute exist
     if yq -e ".steps[$i].table" "$CONFIG_FILE" > /dev/null 2>&1; then
         TABLE_PATH=$(yq -r ".steps[$i].table" "$CONFIG_FILE")
-        TABLE_ENV="TABLE=\"$TABLE_PATH\""
-    else
-        TABLE_ENV=""
+        TABLE_PART="TABLE=${TABLE_PATH}"
     fi
     
     if yq -e ".steps[$i].execute" "$CONFIG_FILE" > /dev/null 2>&1; then
         EXECUTE_PATH=$(yq -r ".steps[$i].execute" "$CONFIG_FILE")
-        EXECUTE_ENV="EXECUTE=\"$EXECUTE_PATH\""
-    else
-        EXECUTE_ENV=""
+        EXECUTE_PART="EXECUTE=${EXECUTE_PATH}"
     fi
     
     echo "-------------------------------------"
     echo "Executing step: $STEP_NAME"
-    if [ -n "$TABLE_ENV" ]; then echo "TABLE=$TABLE_PATH"; fi
-    if [ -n "$EXECUTE_ENV" ]; then echo "EXECUTE=$EXECUTE_PATH"; fi
+    if [ -n "$TABLE_PART" ]; then echo "TABLE=$TABLE_PATH"; fi
+    if [ -n "$EXECUTE_PART" ]; then echo "EXECUTE=$EXECUTE_PATH"; fi
     echo "-------------------------------------"
     
-    # Run the command with only the defined environment variables
-    if [ -n "$TABLE_ENV" ] && [ -n "$EXECUTE_ENV" ]; then
-        $TABLE_ENV $EXECUTE_ENV python module
-    elif [ -n "$TABLE_ENV" ]; then
-        $TABLE_ENV python module
-    elif [ -n "$EXECUTE_ENV" ]; then
-        $EXECUTE_ENV python module
+    # Construct the command
+    CMD=""
+    if [ -n "$TABLE_PART" ]; then
+        CMD="$TABLE_PART"
+    fi
+    
+    if [ -n "$EXECUTE_PART" ]; then
+        if [ -n "$CMD" ]; then
+            CMD="$CMD $EXECUTE_PART"
+        else
+            CMD="$EXECUTE_PART"
+        fi
+    fi
+    
+    # Run the command
+    if [ -n "$CMD" ]; then
+        eval "$CMD python module"
     else
         echo "Warning: Neither TABLE nor EXECUTE defined for this step"
         python module
