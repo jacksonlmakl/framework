@@ -1,20 +1,20 @@
 schedule: "0 0 * * *"  # Run at midnight every day
 
 steps:
-  - name: "Run Replicate Model"
+  - name: "Replicate Data"
     execute: "model/replicate.py"
     
-  - name: "Process Data"
+  - name: "Initialize Table"
     table: "model/table.yaml"
     
-  - name: "Process Data"
+  - name: "Insert Data Into Table"
     table: "model/table.yaml"
     execute: "model/data.json"
   
-  - name: "Execute SQL"
+  - name: "Transform Table With SQL Query"
     table: "model/table.yaml"
     execute: "model/table.sql"
 
-  - name: "Execute SQL"
+  - name: "Execute SQL Script on DB"
     database: "demo"
     execute: "model/test.sql"
