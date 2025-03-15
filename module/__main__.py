@@ -73,7 +73,6 @@ path = os.environ.get('EXECUTE', None)
 data_path = path if path and any(('.json' in path.lower(),'.csv' in path.lower(),'.parquet' in path.lower())) else None
 sql_path = path if path and '.sql' in path.lower() else None
 python_path = path if path and '.py' in path.lower() else None
-print("**DEBUG ",python_path)
 # Establish client
 _db = os.environ.get('DATABASE', None)
 if config_path !=None:
