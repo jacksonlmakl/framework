@@ -221,7 +221,8 @@ elif python_path:
 
 if conn != None:
     conn.close()
-    duckdb_to_iceberg(
-    duckdb_path=f"{config['name']}.duckdb",
-    iceberg_dir="./iceberg_tables"
-)
+    if config_path !=None:
+        duckdb_to_iceberg(
+        duckdb_path=f"{config['database']}.duckdb",
+        iceberg_dir="./iceberg_tables"
+    )
