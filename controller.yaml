@@ -3,7 +3,10 @@ schedule: "0 0 * * *"  # Run at midnight every day
 steps:
   - name: "Run Replicate Model"
     execute: "model/replicate.py"
-  
+    
+  - name: "Process Data"
+    table: "model/table.yaml"
+    
   - name: "Process Data"
     table: "model/table.yaml"
     execute: "model/data.json"
