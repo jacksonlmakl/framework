@@ -10,4 +10,7 @@ steps:
   - name: "Execute SQL"
     table: "model/config.yaml"
     execute: "model/table.sql"
+
+  - name: "Execute SQL"
+  execute: "model/test.sql"
   
