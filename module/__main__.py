@@ -298,16 +298,16 @@ if conn != None:
         duckdb_to_iceberg(
         duckdb_path=f"./duckdb/{config['database']}.duckdb",
         iceberg_dir="./iceberg_tables"
-    )
-    with open('controller.yaml', 'r') as file:
-        controller = yaml.safe_load(file)
-    if 's3' in controller.keys():
-        upload_directory_to_cloud(
-            directory_path="./iceberg_tables",
-            bucket_name=controller['s3']['name']
-            cloud_provider="s3",
-            credentials={
-                "aws_access_key": controller['s3']['access_key']
-                "aws_secret_key": controller['s3']['secret_key']
-            }
         )
+        with open('controller.yaml', 'r') as file:
+            controller = yaml.safe_load(file)
+        if 's3' in controller.keys():
+            upload_directory_to_cloud(
+                directory_path="./iceberg_tables",
+                bucket_name=controller['s3']['name']
+                cloud_provider="s3",
+                credentials={
+                    "aws_access_key": controller['s3']['access_key']
+                    "aws_secret_key": controller['s3']['secret_key']
+                }
+            )
