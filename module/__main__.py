@@ -304,10 +304,10 @@ if conn != None:
         if 's3' in controller.keys():
             upload_directory_to_cloud(
                 directory_path="./iceberg_tables",
-                bucket_name=controller['s3']['name']
+                bucket_name=controller['s3']['name'],  # Missing comma here
                 cloud_provider="s3",
                 credentials={
-                    "aws_access_key": controller['s3']['access_key']
+                    "aws_access_key": controller['s3']['access_key'],  # Missing comma here
                     "aws_secret_key": controller['s3']['secret_key']
                 }
             )
