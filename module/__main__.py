@@ -339,13 +339,13 @@ if conn != None:
         )
         with open('controller.yaml', 'r') as file:
             controller = yaml.safe_load(file)
-        if 's3' in controller and path=='s3':
-            upload_directory_to_cloud(
-                directory_path="./iceberg_tables",
-                bucket_name=controller['s3'][0]['name'],  # Access first item's name
-                cloud_provider="s3",
-                credentials={
-                    "aws_access_key": controller['s3'][1]['access_key'],  # Access second item's access_key
-                    "aws_secret_key": controller['s3'][2]['secret_key']   # Access third item's secret_key
-                }
-            )
+if path=='s3':
+    upload_directory_to_cloud(
+        directory_path="./iceberg_tables",
+        bucket_name=controller['s3'][0]['name'],  # Access first item's name
+        cloud_provider="s3",
+        credentials={
+            "aws_access_key": controller['s3'][1]['access_key'],  # Access second item's access_key
+            "aws_secret_key": controller['s3'][2]['secret_key']   # Access third item's secret_key
+        }
+    )
