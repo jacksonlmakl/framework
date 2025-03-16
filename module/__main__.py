@@ -299,14 +299,15 @@ if conn != None:
         duckdb_path=f"./duckdb/{config['database']}.duckdb",
         iceberg_dir="./iceberg_tables"
     )
-    if False==True:
+    with open('controller.yaml', 'r') as file:
+        controller = yaml.safe_load(file)
+    if 's3' in controller.keys():
         upload_directory_to_cloud(
-            directory_path="my_local_directory",
-            bucket_name="my-s3-bucket",
+            directory_path="./iceberg_tables",
+            bucket_name=controller.get('s3',[{}]).get('name',''),
             cloud_provider="s3",
             credentials={
-                "aws_access_key": "your-access-key-id",
-                "aws_secret_key": "your-secret-access-key",
-                "aws_session_token": "your-session-token"  # Optional
+                "aws_access_key": controller.get('s3',[{}]).get('access_key','')
+                "aws_secret_key": controller.get('s3',[{}]).get('secret_key','')
             }
         )
