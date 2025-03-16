@@ -20,3 +20,6 @@ steps:
   - name: "Execute SQL Script on DB"
     database: "demo"
     execute: "model/test.sql"
+
+   - name: "Upload DB To S3"
+    execute: "s3"
