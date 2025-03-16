@@ -93,7 +93,7 @@ def upload_directory_to_cloud(directory_path, bucket_name, cloud_provider, crede
                 s3_key = os.path.relpath(local_file_path, directory_path)
                 
                 # Upload file
-                s3_client.upload_file(local_file_path, bucket_name, str(generate_unique_hash())+'/'+str(s3_key))
+                s3_client.upload_file(local_file_path, bucket_name, str(round(time.time()))+'_'+str(generate_unique_hash())+'/'+str(s3_key))
                 print(f"Uploaded {local_file_path} to s3://{bucket_name}/{s3_key}")
 
     elif cloud_provider == 'gcs':
