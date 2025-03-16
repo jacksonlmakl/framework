@@ -24,6 +24,44 @@ import os
 import boto3
 from google.cloud import storage
 from azure.storage.blob import BlobServiceClient
+import uuid
+import time
+import hashlib
+import os
+import socket
+
+
+
+
+def generate_unique_hash():
+    """
+    Generate a unique hash key that will be different for every run.
+    Combines multiple sources of entropy to ensure uniqueness.
+    """
+    # Get current timestamp with microsecond precision
+    timestamp = str(time.time_ns())
+    
+    # Generate a UUID (v4 is random)
+    random_uuid = str(uuid.uuid4())
+    
+    # Get process ID
+    process_id = str(os.getpid())
+    
+    # Get hostname
+    hostname = socket.gethostname()
+    
+    # Get a random number from os.urandom
+    random_bytes = os.urandom(16).hex()
+    
+    # Combine all sources of entropy
+    combined = timestamp + random_uuid + process_id + hostname + random_bytes
+    
+    # Create SHA-256 hash of the combined string
+    hash_object = hashlib.sha256(combined.encode())
+    unique_hash = hash_object.hexdigest()
+    
+    return unique_hash
+
 
 def upload_directory_to_cloud(directory_path, bucket_name, cloud_provider, credentials=None):
     """
@@ -55,7 +93,7 @@ def upload_directory_to_cloud(directory_path, bucket_name, cloud_provider, crede
                 s3_key = os.path.relpath(local_file_path, directory_path)
                 
                 # Upload file
-                s3_client.upload_file(local_file_path, bucket_name, s3_key)
+                s3_client.upload_file(local_file_path, bucket_name, str(generate_unique_hash())+'/'+str(s3_key))
                 print(f"Uploaded {local_file_path} to s3://{bucket_name}/{s3_key}")
 
     elif cloud_provider == 'gcs':
