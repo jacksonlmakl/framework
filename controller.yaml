@@ -1,8 +1,8 @@
 schedule: "* * * * *"  # Run Every Minute
 s3: 
- - name: "jacksonmakl"
- - access_key: "AKIAY6QVZNFW2PCQHFOM"
- - secret_key: "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"
+ - name: "jacksonnnn"
+ - access_key: "AKIAY6QVZNFW72362DFZ"
+ - secret_key: "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"
  
 steps:
   - name: "Replicate Data"
