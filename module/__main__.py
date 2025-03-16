@@ -299,7 +299,7 @@ if conn != None:
         duckdb_path=f"./duckdb/{config['database']}.duckdb",
         iceberg_dir="./iceberg_tables"
     )
-    if 's3' in config.keys():
+    if False==True:
         upload_directory_to_cloud(
             directory_path="my_local_directory",
             bucket_name="my-s3-bucket",
