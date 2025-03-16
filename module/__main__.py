@@ -20,6 +20,78 @@ from pyiceberg.types import (
 )
 from pyiceberg.table import TableProperties
 from pyiceberg.partitioning import PartitionSpec
+import os
+import boto3
+from google.cloud import storage
+from azure.storage.blob import BlobServiceClient
+
+def upload_directory_to_cloud(directory_path, bucket_name, cloud_provider, credentials=None):
+    """
+    Uploads a directory to an S3, Google Cloud, or Azure storage bucket.
+
+    :param directory_path: Local directory path to upload
+    :param bucket_name: Name of the cloud storage bucket
+    :param cloud_provider: One of 's3', 'gcs', or 'azure'
+    :param credentials: 
+        - For S3: Dictionary with 'aws_access_key' and 'aws_secret_key'
+        - For GCS: Path to service account JSON file
+        - For Azure: Connection string
+    """
+    if cloud_provider == 's3':
+        if not credentials or 'aws_access_key' not in credentials or 'aws_secret_key' not in credentials:
+            raise ValueError("AWS credentials must be provided as {'aws_access_key': '...', 'aws_secret_key': '...'}")
+
+        # Create S3 client with explicit credentials
+        s3_client = boto3.client(
+            's3',
+            aws_access_key_id=credentials.get('aws_access_key'),
+            aws_secret_access_key=credentials.get('aws_secret_key'),
+            aws_session_token=credentials.get('aws_session_token')  # Optional for temporary credentials
+        )
+
+        for root, _, files in os.walk(directory_path):
+            for file in files:
+                local_file_path = os.path.join(root, file)
+                s3_key = os.path.relpath(local_file_path, directory_path)
+                
+                # Upload file
+                s3_client.upload_file(local_file_path, bucket_name, s3_key)
+                print(f"Uploaded {local_file_path} to s3://{bucket_name}/{s3_key}")
+
+    elif cloud_provider == 'gcs':
+        if not credentials:
+            raise ValueError("Google Cloud requires a path to the service account JSON file.")
+
+        client = storage.Client.from_service_account_json(credentials)
+        bucket = client.bucket(bucket_name)
+
+        for root, _, files in os.walk(directory_path):
+            for file in files:
+                local_file_path = os.path.join(root, file)
+                blob_name = os.path.relpath(local_file_path, directory_path)
+                blob = bucket.blob(blob_name)
+                blob.upload_from_filename(local_file_path)
+                print(f"Uploaded {local_file_path} to gs://{bucket_name}/{blob_name}")
+
+    elif cloud_provider == 'azure':
+        if not credentials:
+            raise ValueError("Azure requires a connection string as credentials.")
+            
+        blob_service_client = BlobServiceClient.from_connection_string(credentials)
+        container_client = blob_service_client.get_container_client(bucket_name)
+
+        for root, _, files in os.walk(directory_path):
+            for file in files:
+                local_file_path = os.path.join(root, file)
+                blob_name = os.path.relpath(local_file_path, directory_path)
+
+                with open(local_file_path, "rb") as data:
+                    container_client.upload_blob(name=blob_name, data=data, overwrite=True)
+                print(f"Uploaded {local_file_path} to azure://{bucket_name}/{blob_name}")
+
+    else:
+        raise ValueError("Unsupported cloud provider. Use 's3', 'gcs', or 'azure'.")
+
 
 def duckdb_to_iceberg(
     duckdb_path, 
@@ -227,3 +299,14 @@ if conn != None:
         duckdb_path=f"./duckdb/{config['database']}.duckdb",
         iceberg_dir="./iceberg_tables"
     )
+    if 's3' in config.keys():
+        upload_directory_to_cloud(
+            directory_path="my_local_directory",
+            bucket_name="my-s3-bucket",
+            cloud_provider="s3",
+            credentials={
+                "aws_access_key": "your-access-key-id",
+                "aws_secret_key": "your-secret-access-key",
+                "aws_session_token": "your-session-token"  # Optional
+            }
+        )
