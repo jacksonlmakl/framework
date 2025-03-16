@@ -1,5 +1,4 @@
 schedule: "0 0 * * *"  # Run at midnight every day
-
 s3: 
  - name: "jackson-storage"
  - access_key: "AKIAY6QVZNFWYWTE47GM"
@@ -16,10 +15,8 @@ steps:
   - name: "Transform Table With SQL Query"
     table: "model/table.yaml"
     execute: "model/table.sql"
-
   - name: "Execute SQL Script on DB"
     database: "demo"
     execute: "model/test.sql"
-
-   - name: "Upload DB To S3"
+  - name: "Upload DB To S3"
     execute: "s3"
