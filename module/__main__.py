@@ -307,7 +307,7 @@ if conn != None:
             bucket_name=controller.get('s3',[{}]).get('name',''),
             cloud_provider="s3",
             credentials={
-                "aws_access_key": controller.get('s3',[{}]).get('access_key','')
+                "aws_access_key": controller.get('s3',[{}]).get('access_key',''),
                 "aws_secret_key": controller.get('s3',[{}]).get('secret_key','')
             }
         )
