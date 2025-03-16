@@ -12,6 +12,191 @@ CONTAINER_NAME="framework-scheduler"
 
 echo "🔍 Checking environment..."
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+#!/bin/bash
+
+# Script to install Docker if not already installed
+# Supports Ubuntu, Debian, CentOS, Fedora, RHEL, macOS, and Amazon Linux
+
+# Function to check if Docker is installed
+check_docker_installed() {
+  if command -v docker &> /dev/null; then
+    echo "Docker is already installed. Version:"
+    docker --version
+    return 0
+  else
+    return 1
+  fi
+}
+
+# Function to install Docker on Debian-based systems (Ubuntu, Debian)
+install_docker_debian() {
+  echo "Installing Docker on Debian-based system..."
+  
+  # Update package index
+  sudo apt-get update
+  
+  # Install dependencies
+  sudo apt-get install -y \
+    ca-certificates \
+    curl \
+    gnupg \
+    lsb-release
+
+  # Add Docker's official GPG key
+  sudo mkdir -p /etc/apt/keyrings
+  curl -fsSL https://download.docker.com/linux/$(lsb_release -is | tr '[:upper:]' '[:lower:]')/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+  
+  # Set up the Docker repository
+  echo \
+    "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/$(lsb_release -is | tr '[:upper:]' '[:lower:]') \
+    $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+  
+  # Update apt package index
+  sudo apt-get update
+  
+  # Install Docker Engine
+  sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+  
+  # Add current user to the docker group
+  sudo usermod -aG docker $USER
+  
+  echo "Docker installed successfully"
+}
+
+# Function to install Docker on Red Hat-based systems (CentOS, Fedora, RHEL)
+install_docker_redhat() {
+  echo "Installing Docker on Red Hat-based system..."
+  
+  # Install required packages
+  sudo yum install -y yum-utils
+  
+  # Add Docker repository
+  sudo yum-config-manager --add-repo https://download.docker.com/linux/$(. /etc/os-release; echo "$ID")/docker-ce.repo
+  
+  # Install Docker Engine
+  sudo yum install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+  
+  # Start Docker
+  sudo systemctl start docker
+  
+  # Enable Docker to start on boot
+  sudo systemctl enable docker
+  
+  # Add current user to the docker group
+  sudo usermod -aG docker $USER
+  
+  echo "Docker installed successfully"
+}
+
+# Function to install Docker on Amazon Linux
+install_docker_amazon() {
+  echo "Installing Docker on Amazon Linux..."
+  
+  # Update packages
+  sudo amazon-linux-extras install docker -y
+  
+  # Start Docker
+  sudo service docker start
+  
+  # Enable Docker to start on boot
+  sudo systemctl enable docker
+  
+  # Add current user to the docker group
+  sudo usermod -aG docker $USER
+  
+  echo "Docker installed successfully"
+}
+
+# Function to install Docker on macOS
+install_docker_mac() {
+  echo "For macOS, Docker Desktop is recommended."
+  echo "This script will download the Docker Desktop installer for you."
+  
+  # Download Docker Desktop for Mac
+  curl -L "https://desktop.docker.com/mac/main/amd64/Docker.dmg" -o ~/Downloads/Docker.dmg
+  
+  echo "Docker Desktop installer downloaded to ~/Downloads/Docker.dmg"
+  echo "Please open the DMG file and drag Docker to Applications folder."
+  
+  # Attempt to mount the DMG and install
+  hdiutil attach ~/Downloads/Docker.dmg
+  
+  echo "Docker installation file is mounted. Please complete the installation manually."
+}
+
+# Main script
+echo "Checking for Docker installation..."
+
+if check_docker_installed; then
+  echo "Docker is already installed. No action needed."
+  exit 0
+fi
+
+# Detect operating system
+if [[ "$OSTYPE" == "darwin"* ]]; then
+  # macOS
+  install_docker_mac
+elif [[ -f /etc/os-release ]]; then
+  # Linux distribution
+  source /etc/os-release
+  
+  case "$ID" in
+    ubuntu|debian|pop|elementary|mint|kali|zorin)
+      install_docker_debian
+      ;;
+    centos|fedora|rhel|rocky|almalinux|ol)
+      install_docker_redhat
+      ;;
+    amzn)
+      install_docker_amazon
+      ;;
+    *)
+      echo "Unsupported Linux distribution: $ID"
+      echo "Please install Docker manually for your distribution"
+      exit 1
+      ;;
+  esac
+else
+  echo "Unsupported operating system"
+  echo "Please install Docker manually for your operating system"
+  exit 1
+fi
+
+echo "Please log out and back in for group changes to take effect, or run:"
+echo "newgrp docker"
+echo "to update your current session."
+
+echo "You can test your Docker installation with: docker run hello-world"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # Check if we're in the repository root directory
 if [ ! -d "./bin" ] || [ ! -f "./bin/run" ]; then
     echo "❌ Error: This script should be run from the repository root directory."
