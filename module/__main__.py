@@ -337,9 +337,10 @@ if conn != None:
         duckdb_path=f"./duckdb/{config['database']}.duckdb",
         iceberg_dir="./iceberg_tables"
         )
-        with open('controller.yaml', 'r') as file:
-            controller = yaml.safe_load(file)
+
 if path=='s3':
+    with open('controller.yaml', 'r') as file:
+        controller = yaml.safe_load(file)
     upload_directory_to_cloud(
         directory_path="./iceberg_tables",
         bucket_name=controller['s3'][0]['name'],  # Access first item's name
