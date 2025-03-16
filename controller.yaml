@@ -1,4 +1,4 @@
-schedule: "0 0 * * *"  # Run at midnight every day
+schedule: "* * * * *"  # Run Every Minute
 s3: 
  - name: "jackson-storage"
  - access_key: "AKIAY6QVZNFWYWTE47GM"
