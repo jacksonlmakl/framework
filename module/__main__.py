@@ -339,7 +339,7 @@ if conn != None:
         )
         with open('controller.yaml', 'r') as file:
             controller = yaml.safe_load(file)
-        if 's3' in controller:
+        if 's3' in controller and path=='s3':
             upload_directory_to_cloud(
                 directory_path="./iceberg_tables",
                 bucket_name=controller['s3'][0]['name'],  # Access first item's name
