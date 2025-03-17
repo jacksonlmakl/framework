@@ -23,71 +23,141 @@ const App = () => {
     loadConfig();
   }, []);
 
-  const loadConfig = async () => {
-    try {
-      setIsLoading(true);
-      
-      // Use fetch to get the controller.yaml file
-      const response = await fetch('/controller.yaml');
-      if (!response.ok) {
-        throw new Error(`Failed to load controller.yaml: ${response.status} ${response.statusText}`);
-      }
-      
-      const yamlContent = await response.text();
-      
-      // Parse YAML content using js-yaml
-      const parsedConfig = yaml.load(yamlContent);
-      
-      // Process the S3 config which is in array format
-      const s3Config = {
-        name: '',
-        access_key: '',
-        secret_key: ''
+// Modify loadConfig function to better handle errors and missing files
+const loadConfig = async () => {
+  try {
+    setIsLoading(true);
+    
+    // Check if controller.yaml exists first
+    const response = await fetch('/controller.yaml');
+    
+    // If file doesn't exist, create default structure
+    if (response.status === 404) {
+      console.log("controller.yaml not found. Creating default config.");
+      const defaultSteps = [];
+      const defaultConfig = {
+        schedule: '* * * * *',
+        s3: {
+          name: '',
+          access_key: '',
+          secret_key: ''
+        }
       };
       
-      if (Array.isArray(parsedConfig.s3)) {
-        parsedConfig.s3.forEach(item => {
-          if (item.name) s3Config.name = item.name;
-          if (item.access_key) s3Config.access_key = item.access_key;
-          if (item.secret_key) s3Config.secret_key = item.secret_key;
-        });
-      }
-      
-      // Process steps to add the type field
-      const processedSteps = parsedConfig.steps.map(step => {
+      setGlobalConfig(defaultConfig);
+      setSteps(defaultSteps);
+      return;
+    }
+    
+    if (!response.ok) {
+      throw new Error(`Failed to load controller.yaml: ${response.status} ${response.statusText}`);
+    }
+    
+    const yamlContent = await response.text();
+    
+    // Manual parsing of YAML
+    // Extract schedule
+    const scheduleMatch = yamlContent.match(/schedule: "([^"]*)"/);
+    const schedule = scheduleMatch ? scheduleMatch[1] : "";
+    
+    // Extract s3 configuration
+    const s3ConfigLines = yamlContent.match(/s3:[\s\S]*?(?=steps:|$)/);
+    if (!s3ConfigLines) {
+      throw new Error("Invalid YAML format: s3 section not found");
+    }
+    
+    const s3Config = {
+      name: '',
+      access_key: '',
+      secret_key: ''
+    };
+    
+    const s3NameMatch = s3ConfigLines[0].match(/name: "([^"]*)"/);
+    const s3AccessKeyMatch = s3ConfigLines[0].match(/access_key: "([^"]*)"/);
+    const s3SecretKeyMatch = s3ConfigLines[0].match(/secret_key: "([^"]*)"/);
+    
+    if (s3NameMatch) s3Config.name = s3NameMatch[1];
+    if (s3AccessKeyMatch) s3Config.access_key = s3AccessKeyMatch[1];
+    if (s3SecretKeyMatch) s3Config.secret_key = s3SecretKeyMatch[1];
+    
+    // Extract steps
+    const stepsMatch = yamlContent.match(/steps:[\s\S]*/);
+    if (!stepsMatch) {
+      throw new Error("Invalid YAML format: steps section not found");
+    }
+    
+    const stepsSection = stepsMatch[0];
+    const stepBlocks = stepsSection.split(/\s{2}-\s/).slice(1);
+    
+    let parsedSteps = [];
+    
+    if (stepBlocks && stepBlocks.length > 0) {
+      parsedSteps = stepBlocks.map(block => {
+        const nameMatch = block.match(/name: "([^"]*)"/);
+        const executeMatch = block.match(/execute: "([^"]*)"/);
+        const tableMatch = block.match(/table: "([^"]*)"/);
+        const databaseMatch = block.match(/database: "([^"]*)"/);
+        
+        if (!nameMatch || !executeMatch) {
+          console.warn("Found step with missing required fields:", block);
+          return null;
+        }
+        
+        const name = nameMatch[1];
+        const execute = executeMatch[1];
+        
         let type = "Python"; // Default type
         
-        if (step.execute === "s3") {
+        if (execute === "s3") {
           type = "S3 Upload";
-        } else if (step.table && step.execute.endsWith(".json")) {
+        } else if (tableMatch && execute.endsWith(".json")) {
           type = "SQL Insert";
-        } else if (step.table && step.execute.endsWith(".sql")) {
+        } else if (tableMatch && execute.endsWith(".sql")) {
           type = "SQL Query";
-        } else if (step.database && step.execute.endsWith(".sql")) {
+        } else if (databaseMatch && execute.endsWith(".sql")) {
           type = "SQL Script";
         }
         
-        return { ...step, type };
-      });
-      
-      setGlobalConfig({
-        schedule: parsedConfig.schedule,
-        s3: s3Config
-      });
-      
-      setSteps(processedSteps);
-    } catch (error) {
-      console.error("Error loading configuration:", error);
-      alert(`Error loading configuration: ${error.message}`);
-      
-      // If file doesn't exist, create with default structure
-      if (error.message.includes('404')) {
-        console.log("Creating new controller.yaml file with default structure");
-      }
-    } finally {
-      setIsLoading(false);
+        const step = { name, execute, type };
+        
+        if (tableMatch) {
+          step.table = tableMatch[1];
+        }
+        
+        if (databaseMatch) {
+          step.database = databaseMatch[1];
+        }
+        
+        return step;
+      }).filter(step => step !== null);
     }
-  };
+    
+    setGlobalConfig({
+      schedule,
+      s3: s3Config
+    });
+    
+    setSteps(parsedSteps);
+    
+  } catch (error) {
+    console.error("Error loading configuration:", error);
+    alert(`Error loading configuration: ${error.message}`);
+    
+    // Set defaults if there's an error
+    setGlobalConfig({
+      schedule: '* * * * *',
+      s3: {
+        name: '',
+        access_key: '',
+        secret_key: ''
+      }
+    });
+    
+    setSteps([]);
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const saveConfig = async () => {
     try {
