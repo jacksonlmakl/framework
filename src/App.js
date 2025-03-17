@@ -230,11 +230,11 @@ const loadConfig = async () => {
   };
 
   const runFlow = () => {
-    executeTerminalCommand('cd .. && ./bin/deploy && cd -', 'Flow started successfully');
+    executeTerminalCommand('.../bin/deploy', 'Flow started successfully');
   };
 
   const deployFlow = () => {
-    executeTerminalCommand('cd .. && ./bin/deploy && cd -', 'Flow deployed successfully');
+    executeTerminalCommand('.../bin/deploy', 'Flow deployed successfully');
   };
 
   const stopFlow = () => {
