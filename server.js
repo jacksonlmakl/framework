@@ -82,7 +82,7 @@ app.post('/execute-command', (req, res) => {
     return res.status(403).json({ error: 'Command not allowed' });
   }
   
-  exec('cd .. && '+command, (error, stdout, stderr) => {
+  exec(command, (error, stdout, stderr) => {
     if (error) {
       console.error(`Error executing command: ${error}`);
       return res.status(500).json({ 
