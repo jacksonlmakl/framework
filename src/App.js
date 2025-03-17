@@ -141,6 +141,58 @@ const loadConfig = async () => {
   }
 };
 
+ const saveConfig = async () => {
+     try {
+       setIsLoading(true);
+       
+       // Format the s3 configuration as an array of objects for YAML output
+       const s3Array = [
+         { name: globalConfig.s3.name },
+         { access_key: globalConfig.s3.access_key },
+         { secret_key: globalConfig.s3.secret_key }
+       ];
+       
+       // Prepare steps without the type field (since it's not in the file format)
+       const cleanSteps = steps.map(step => {
+         const { type, ...cleanStep } = step;
+         return cleanStep;
+       });
+       
+       // Create the config object
+       const configToSave = {
+         schedule: globalConfig.schedule,
+         s3: s3Array,
+         steps: cleanSteps
+       };
+       
+       // Convert to YAML
+       const yamlContent = yaml.dump(configToSave);
+       
+       // Use fetch to save the controller.yaml file
+       const response = await fetch('/save-config', {
+         method: 'POST',
+         headers: {
+           'Content-Type': 'application/json',
+         },
+         body: JSON.stringify({ content: yamlContent }),
+       });
+       
+       if (!response.ok) {
+         throw new Error(`Failed to save configuration: ${response.status} ${response.statusText}`);
+       }
+       
+       alert("Configuration saved to controller.yaml");
+     } catch (error) {
+       console.error("Error saving configuration:", error);
+       alert(`Error saving configuration: ${error.message}`);
+     } finally {
+       setIsLoading(false);
+     }
+   };
+ 
+
+
+  
   const executeTerminalCommand = async (command, successMessage) => {
     try {
       setIsLoading(true);
