@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Settings, Play, Upload, AlertCircle, Terminal, X, Save, Edit2 } from 'lucide-react';
+import yaml from 'js-yaml'; // Import js-yaml for parsing YAML files
 
 const App = () => {
   const [steps, setSteps] = useState([]);
@@ -15,6 +16,7 @@ const App = () => {
   const [editingStepIndex, setEditingStepIndex] = useState(null);
   const [logs, setLogs] = useState('');
   const [showLogs, setShowLogs] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Load configuration on initial render
   useEffect(() => {
@@ -23,169 +25,169 @@ const App = () => {
 
   const loadConfig = async () => {
     try {
-      // In a real app, this would use the actual file system API
-      // Here we'll use the actual structure from the uploaded controller.yaml
-      console.log("Loading controller.yaml");
+      setIsLoading(true);
       
-      // Parse the YAML content from controller.yaml
-      const yamlContent = `schedule: "* * * * *"  # Run Every Minute
-s3: 
- - name: "jacksonnnn"
- - access_key: "AKIAY6QVZNFW72362DFZ"
- - secret_key: "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"
- 
-steps:
-  - name: "Replicate Data"
-    execute: "model/replicate.py"
-    
-  - name: "Initialize Table & Insert Replication Data"
-    table: "model/table.yaml"
-    execute: "model/data.json"
-  
-  - name: "Transform Table With SQL Query"
-    table: "model/table.yaml"
-    execute: "model/table.sql"
-    
-  - name: "Execute SQL Script on DB"
-    database: "demo"
-    execute: "model/test.sql"
-    
-  - name: "Upload DB To S3"
-    execute: "s3"`;
+      // Use fetch to get the controller.yaml file
+      const response = await fetch('/controller.yaml');
+      if (!response.ok) {
+        throw new Error(`Failed to load controller.yaml: ${response.status} ${response.statusText}`);
+      }
       
-      // Parse the YAML structure
-      // In a real implementation, we would use a proper YAML parser
-      // For simplicity, we'll parse it manually here
+      const yamlContent = await response.text();
       
-      // Extract schedule
-      const scheduleMatch = yamlContent.match(/schedule: "([^"]*)"/);
-      const schedule = scheduleMatch ? scheduleMatch[1] : "";
+      // Parse YAML content using js-yaml
+      const parsedConfig = yaml.load(yamlContent);
       
-      // Extract s3 configuration
-      const s3ConfigLines = yamlContent.match(/s3:[\s\S]*?(?=steps:|$)/)[0];
-      const s3NameMatch = s3ConfigLines.match(/name: "([^"]*)"/);
-      const s3AccessKeyMatch = s3ConfigLines.match(/access_key: "([^"]*)"/);
-      const s3SecretKeyMatch = s3ConfigLines.match(/secret_key: "([^"]*)"/);
-      
+      // Process the S3 config which is in array format
       const s3Config = {
-        name: s3NameMatch ? s3NameMatch[1] : "",
-        access_key: s3AccessKeyMatch ? s3AccessKeyMatch[1] : "",
-        secret_key: s3SecretKeyMatch ? s3SecretKeyMatch[1] : ""
+        name: '',
+        access_key: '',
+        secret_key: ''
       };
       
-      // Extract steps
-      const stepsSection = yamlContent.match(/steps:[\s\S]*/)[0];
-      const stepBlocks = stepsSection.split(/\s{2}-\s/).slice(1);
+      if (Array.isArray(parsedConfig.s3)) {
+        parsedConfig.s3.forEach(item => {
+          if (item.name) s3Config.name = item.name;
+          if (item.access_key) s3Config.access_key = item.access_key;
+          if (item.secret_key) s3Config.secret_key = item.secret_key;
+        });
+      }
       
-      const parsedSteps = stepBlocks.map(block => {
-        const nameMatch = block.match(/name: "([^"]*)"/);
-        const executeMatch = block.match(/execute: "([^"]*)"/);
-        const tableMatch = block.match(/table: "([^"]*)"/);
-        const databaseMatch = block.match(/database: "([^"]*)"/);
-        
-        const name = nameMatch ? nameMatch[1] : "";
-        const execute = executeMatch ? executeMatch[1] : "";
-        
+      // Process steps to add the type field
+      const processedSteps = parsedConfig.steps.map(step => {
         let type = "Python"; // Default type
         
-        if (execute === "s3") {
+        if (step.execute === "s3") {
           type = "S3 Upload";
-        } else if (tableMatch && execute.endsWith(".json")) {
+        } else if (step.table && step.execute.endsWith(".json")) {
           type = "SQL Insert";
-        } else if (tableMatch && execute.endsWith(".sql")) {
+        } else if (step.table && step.execute.endsWith(".sql")) {
           type = "SQL Query";
-        } else if (databaseMatch && execute.endsWith(".sql")) {
+        } else if (step.database && step.execute.endsWith(".sql")) {
           type = "SQL Script";
         }
         
-        const step = { name, execute, type };
-        
-        if (tableMatch) {
-          step.table = tableMatch[1];
-        }
-        
-        if (databaseMatch) {
-          step.database = databaseMatch[1];
-        }
-        
-        return step;
+        return { ...step, type };
       });
       
       setGlobalConfig({
-        schedule,
+        schedule: parsedConfig.schedule,
         s3: s3Config
       });
       
-      setSteps(parsedSteps);
-      
+      setSteps(processedSteps);
     } catch (error) {
       console.error("Error loading configuration:", error);
-      setSteps([]);
+      alert(`Error loading configuration: ${error.message}`);
+      
+      // If file doesn't exist, create with default structure
+      if (error.message.includes('404')) {
+        console.log("Creating new controller.yaml file with default structure");
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const saveConfig = () => {
-    // Generate YAML content to save to controller.yaml
-    let yamlContent = `schedule: "${globalConfig.schedule}"  # Run Every Minute
-s3: 
- - name: "${globalConfig.s3.name}"
- - access_key: "${globalConfig.s3.access_key}"
- - secret_key: "${globalConfig.s3.secret_key}"
- 
-steps:`;
+  const saveConfig = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Format the s3 configuration as an array of objects for YAML output
+      const s3Array = [
+        { name: globalConfig.s3.name },
+        { access_key: globalConfig.s3.access_key },
+        { secret_key: globalConfig.s3.secret_key }
+      ];
+      
+      // Prepare steps without the type field (since it's not in the file format)
+      const cleanSteps = steps.map(step => {
+        const { type, ...cleanStep } = step;
+        return cleanStep;
+      });
+      
+      // Create the config object
+      const configToSave = {
+        schedule: globalConfig.schedule,
+        s3: s3Array,
+        steps: cleanSteps
+      };
+      
+      // Convert to YAML
+      const yamlContent = yaml.dump(configToSave);
+      
+      // Use fetch to save the controller.yaml file
+      const response = await fetch('/save-config', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ content: yamlContent }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to save configuration: ${response.status} ${response.statusText}`);
+      }
+      
+      alert("Configuration saved to controller.yaml");
+    } catch (error) {
+      console.error("Error saving configuration:", error);
+      alert(`Error saving configuration: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    // Add each step to the YAML content
-    steps.forEach(step => {
-      yamlContent += `\n  - name: "${step.name}"`;
+  const executeTerminalCommand = async (command, successMessage) => {
+    try {
+      setIsLoading(true);
+      setLogs(`Executing: ${command}\n...`);
+      setShowLogs(true);
       
-      if (step.table) {
-        yamlContent += `\n    table: "${step.table}"`;
+      // Use fetch to execute the command
+      const response = await fetch('/execute-command', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ command }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Command execution failed: ${response.status} ${response.statusText}`);
       }
       
-      if (step.database) {
-        yamlContent += `\n    database: "${step.database}"`;
+      const result = await response.json();
+      
+      setLogs(`Executing: ${command}\n\n${result.output}`);
+      
+      if (result.success) {
+        console.log(`${successMessage}: ${result.output}`);
+      } else {
+        console.error(`Command failed: ${result.error}`);
       }
-      
-      yamlContent += `\n    execute: "${step.execute}"`;
-      
-      // Add an empty line between steps for readability
-      yamlContent += `\n`;
-    });
-    
-    // In a real app, this would write to the file system
-    console.log("Saving configuration:");
-    console.log(yamlContent);
-    
-    // Show a success message
-    alert("Configuration saved to controller.yaml");
+    } catch (error) {
+      console.error("Error executing command:", error);
+      setLogs(`Error executing ${command}: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const runFlow = () => {
-    // Simulate running the flow
-    console.log("Running flow with ./bin/run");
-    setLogs("Executing ./bin/run\n...\nFlow started successfully.");
-    setShowLogs(true);
+    executeTerminalCommand('./bin/run', 'Flow started successfully');
   };
 
   const deployFlow = () => {
-    // Simulate deploying the flow
-    console.log("Deploying flow with ./bin/deploy");
-    setLogs("Executing ./bin/deploy\n...\nFlow deployed successfully.");
-    setShowLogs(true);
+    executeTerminalCommand('./bin/deploy', 'Flow deployed successfully');
   };
 
   const stopFlow = () => {
-    // Simulate stopping the flow
-    console.log("Stopping flow with sudo docker stop framework-scheduler");
-    setLogs("Executing sudo docker stop framework-scheduler\n...\nFlow stopped successfully.");
-    setShowLogs(true);
+    executeTerminalCommand('sudo docker stop framework-scheduler', 'Flow stopped successfully');
   };
 
   const viewLogs = () => {
-    // Simulate viewing logs
-    console.log("Viewing logs with sudo docker logs framework-scheduler");
-    setLogs("Executing sudo docker logs framework-scheduler\n\n[2025-03-17 10:15:23] INFO: Starting workflow\n[2025-03-17 10:15:24] INFO: Step 1 completed\n[2025-03-17 10:15:25] INFO: Step 2 completed\n[2025-03-17 10:15:27] INFO: Step 3 completed\n[2025-03-17 10:15:28] INFO: Step 4 completed\n[2025-03-17 10:15:30] INFO: Step 5 completed\n[2025-03-17 10:15:31] INFO: Workflow completed successfully");
-    setShowLogs(true);
+    executeTerminalCommand('sudo docker logs framework-scheduler', 'Logs retrieved successfully');
   };
 
   const addStep = () => {
@@ -430,7 +432,7 @@ steps:`;
                 onChange={handleChange}
                 className="w-full p-2 border border-gray-300 rounded" 
               />
-              <p className="text-xs text-gray-500 mt-1">Format: "0 0 0 0 0*" (minute hour day month weekday)</p>
+              <p className="text-xs text-gray-500 mt-1">Format: "* * * * *" (minute hour day month weekday)</p>
             </div>
             
             <div className="border-t pt-4">
@@ -517,6 +519,18 @@ steps:`;
     );
   };
 
+  // Loading overlay
+  const LoadingOverlay = () => {
+    return isLoading ? (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white p-4 rounded-lg shadow-lg">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500 mx-auto"></div>
+          <p className="mt-3 text-center">Processing...</p>
+        </div>
+      </div>
+    ) : null;
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto p-4">
@@ -526,7 +540,8 @@ steps:`;
           <div className="flex space-x-2">
             <button 
               onClick={saveConfig}
-              className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 flex items-center"
+              disabled={isLoading}
+              className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 flex items-center disabled:opacity-50"
             >
               <Save size={18} className="mr-1" />
               Save
@@ -534,7 +549,8 @@ steps:`;
             
             <button 
               onClick={() => setShowSettingsModal(true)}
-              className="bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300 flex items-center"
+              disabled={isLoading}
+              className="bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300 flex items-center disabled:opacity-50"
             >
               <Settings size={18} className="mr-1" />
               Settings
@@ -549,7 +565,8 @@ steps:`;
                 <h2 className="text-xl font-semibold">Flow Steps</h2>
                 <button 
                   onClick={addStep}
-                  className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600 flex items-center"
+                  disabled={isLoading}
+                  className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600 flex items-center disabled:opacity-50"
                 >
                   <Plus size={18} className="mr-1" />
                   Add Step
@@ -579,7 +596,8 @@ steps:`;
             <div className="space-y-4">
               <button 
                 onClick={runFlow}
-                className="w-full bg-green-500 text-white px-4 py-3 rounded hover:bg-green-600 flex items-center justify-center"
+                disabled={isLoading}
+                className="w-full bg-green-500 text-white px-4 py-3 rounded hover:bg-green-600 flex items-center justify-center disabled:opacity-50"
               >
                 <Play size={18} className="mr-2" />
                 Run
@@ -587,7 +605,8 @@ steps:`;
               
               <button 
                 onClick={deployFlow}
-                className="w-full bg-blue-500 text-white px-4 py-3 rounded hover:bg-blue-600 flex items-center justify-center"
+                disabled={isLoading}
+                className="w-full bg-blue-500 text-white px-4 py-3 rounded hover:bg-blue-600 flex items-center justify-center disabled:opacity-50"
               >
                 <Upload size={18} className="mr-2" />
                 Deploy
@@ -595,7 +614,8 @@ steps:`;
               
               <button 
                 onClick={stopFlow}
-                className="w-full bg-red-500 text-white px-4 py-3 rounded hover:bg-red-600 flex items-center justify-center"
+                disabled={isLoading}
+                className="w-full bg-red-500 text-white px-4 py-3 rounded hover:bg-red-600 flex items-center justify-center disabled:opacity-50"
               >
                 <X size={18} className="mr-2" />
                 Stop
@@ -603,7 +623,8 @@ steps:`;
               
               <button 
                 onClick={viewLogs}
-                className="w-full bg-gray-700 text-white px-4 py-3 rounded hover:bg-gray-800 flex items-center justify-center"
+                disabled={isLoading}
+                className="w-full bg-gray-700 text-white px-4 py-3 rounded hover:bg-gray-800 flex items-center justify-center disabled:opacity-50"
               >
                 <Terminal size={18} className="mr-2" />
                 Logs
@@ -620,6 +641,8 @@ steps:`;
       {showSettingsModal && <SettingsModal />}
       
       {showLogs && <LogsModal />}
+      
+      <LoadingOverlay />
     </div>
   );
 };
