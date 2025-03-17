@@ -574,15 +574,7 @@ const loadConfig = async () => {
             <h2 className="text-xl font-semibold mb-6">Actions</h2>
             
             <div className="space-y-4">
-              <button 
-                onClick={runFlow}
-                disabled={isLoading}
-                style="display: none !important;"
-                className="w-full bg-green-500 text-white px-4 py-3 rounded hover:bg-green-600 flex items-center justify-center disabled:opacity-50"
-              >
-                <Play size={18} className="mr-2" />
-                Run
-              </button>
+
               
               <button 
                 onClick={deployFlow}
