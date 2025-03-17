@@ -18,6 +18,49 @@ const App = () => {
   const [showLogs, setShowLogs] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
+const LoadingOverlay = () => {
+  return isLoading ? (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white p-4 rounded-lg shadow-lg">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500 mx-auto"></div>
+        <p className="mt-3 text-center">Processing...</p>
+      </div>
+    </div>
+  ) : null;
+};
+const LogsModal = () => {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 overflow-y-auto p-4">
+        <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] flex flex-col relative">
+          <div className="flex justify-between items-center mb-4 sticky top-0 bg-white z-10">
+            <h2 className="text-xl font-semibold flex items-center">
+              <Terminal size={20} className="mr-2" />
+              Logs
+            </h2>
+            <button 
+              onClick={() => setShowLogs(false)} 
+              className="text-gray-500 hover:text-gray-700"
+            >
+              <X size={20} />
+            </button>
+          </div>
+          
+          <div className="flex-1 overflow-auto bg-gray-900 text-gray-100 p-4 font-mono rounded max-h-[calc(90vh-120px)]">
+            <pre>{logs}</pre>
+          </div>
+          
+          <div className="mt-4 flex justify-end sticky bottom-0 bg-white z-10 pt-2">
+            <button 
+              onClick={() => setShowLogs(false)}
+              className="bg-gray-300 text-gray-800 px-4 py-2 rounded hover:bg-gray-400"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
   // Load configuration on initial render
   useEffect(() => {
     loadConfig();
@@ -787,51 +830,114 @@ error_behavior: "null"
       </div>
     );
   };
-
-    // Loading overlay
-  const LoadingOverlay = () => {
-    return isLoading ? (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white p-4 rounded-lg shadow-lg">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500 mx-auto"></div>
-          <p className="mt-3 text-center">Processing...</p>
-        </div>
-      </div>
-    ) : null;
-  };
-
-  const LogsModal = () => {
-    return (
-      <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 overflow-y-auto p-4">
-        <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] flex flex-col relative">
-          <div className="flex justify-between items-center mb-4 sticky top-0 bg-white z-10">
-            <h2 className="text-xl font-semibold flex items-center">
-              <Terminal size={20} className="mr-2" />
-              Logs
-            </h2>
+  
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="container mx-auto p-4">
+        <header className="bg-white shadow rounded-lg p-4 mb-6 flex justify-between items-center">
+          <h1 className="text-2xl font-bold text-gray-800">Workflow Configuration</h1>
+          
+          <div className="flex space-x-2">
             <button 
-              onClick={() => setShowLogs(false)} 
-              className="text-gray-500 hover:text-gray-700"
+              onClick={saveConfig}
+              disabled={isLoading}
+              className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 flex items-center disabled:opacity-50"
             >
-              <X size={20} />
+              <Save size={18} className="mr-1" />
+              Save
+            </button>
+            
+            <button 
+              onClick={() => setShowSettingsModal(true)}
+              disabled={isLoading}
+              className="bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300 flex items-center disabled:opacity-50"
+            >
+              <Settings size={18} className="mr-1" />
+              Settings
             </button>
           </div>
-          
-          <div className="flex-1 overflow-auto bg-gray-900 text-gray-100 p-4 font-mono rounded max-h-[calc(90vh-120px)]">
-            <pre>{logs}</pre>
+        </header>
+        
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="md:col-span-3">
+            <div className="bg-white shadow rounded-lg p-6 min-h-96">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-semibold">Flow Steps</h2>
+                <button 
+                  onClick={addStep}
+                  disabled={isLoading}
+                  className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600 flex items-center disabled:opacity-50"
+                >
+                  <Plus size={18} className="mr-1" />
+                  Add Step
+                </button>
+              </div>
+              
+              {steps.length === 0 ? (
+                <div className="flex flex-col items-center justify-center p-12 border-2 border-dashed border-gray-300 rounded-lg">
+                  <AlertCircle size={48} className="text-gray-400 mb-4" />
+                  <p className="text-gray-500 text-center">No steps defined yet. Click "Add Step" to create a workflow.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <div className="flex items-center space-x-4 py-4 px-2 min-w-max">
+                    {steps.map((step, index) => (
+                      <StepNode key={index} step={step} index={index} />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
           
-          <div className="mt-4 flex justify-end sticky bottom-0 bg-white z-10 pt-2">
-            <button 
-              onClick={() => setShowLogs(false)}
-              className="bg-gray-300 text-gray-800 px-4 py-2 rounded hover:bg-gray-400"
-            >
-              Close
-            </button>
+          <div className="bg-white shadow rounded-lg p-6">
+            <h2 className="text-xl font-semibold mb-6">Actions</h2>
+            
+            <div className="space-y-4">
+              
+              <button 
+                onClick={deployFlow}
+                disabled={isLoading}
+                className="w-full bg-blue-500 text-white px-4 py-3 rounded hover:bg-blue-600 flex items-center justify-center disabled:opacity-50"
+              >
+                <Upload size={18} className="mr-2" />
+                Deploy
+              </button>
+              
+              <button 
+                onClick={stopFlow}
+                disabled={isLoading}
+                className="w-full bg-red-500 text-white px-4 py-3 rounded hover:bg-red-600 flex items-center justify-center disabled:opacity-50"
+              >
+                <X size={18} className="mr-2" />
+                Stop
+              </button>
+              
+              <button 
+                onClick={viewLogs}
+                disabled={isLoading}
+                className="w-full bg-gray-700 text-white px-4 py-3 rounded hover:bg-gray-800 flex items-center justify-center disabled:opacity-50"
+              >
+                <Terminal size={18} className="mr-2" />
+                Logs
+              </button>
+            </div>
           </div>
         </div>
       </div>
-    );
-  };
+      
+      {editingStepIndex !== null && (
+        <StepEditForm step={steps[editingStepIndex]} index={editingStepIndex} />
+      )}
+      
+      {showSettingsModal && <SettingsModal />}
+      
+      {showLogs && <LogsModal />}
+      
+      <LoadingOverlay />
+    </div>
+  );
+};
 
 export default App;
+
