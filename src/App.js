@@ -56,41 +56,33 @@ const loadConfig = async () => {
     const yamlContent = await response.text();
     console.log("Loaded YAML content:", yamlContent);
     
-    // More flexible parsing approach
-    let schedule = '* * * * *'; // Default schedule
-    let s3Config = {
+    // Parse YAML with js-yaml instead of regex
+    const parsedYaml = yaml.load(yamlContent);
+    console.log("Parsed YAML:", parsedYaml);
+    
+    // Extract schedule
+    const schedule = parsedYaml.schedule || '* * * * *';
+    
+    // Extract s3 config
+    const s3Config = {
       name: '',
       access_key: '',
       secret_key: ''
     };
-    let parsedSteps = [];
     
-    // Extract schedule
-    const scheduleMatch = yamlContent.match(/schedule:\s*"([^"]*)"/);
-    if (scheduleMatch && scheduleMatch[1]) {
-      schedule = scheduleMatch[1];
+    if (Array.isArray(parsedYaml.s3)) {
+      parsedYaml.s3.forEach(item => {
+        if (item.name) s3Config.name = item.name;
+        if (item.access_key) s3Config.access_key = item.access_key;
+        if (item.secret_key) s3Config.secret_key = item.secret_key;
+      });
     }
     
-    // Extract s3 config - make this more flexible
-    const s3NameMatch = yamlContent.match(/name:\s*"([^"]*)"/);
-    const s3AccessKeyMatch = yamlContent.match(/access_key:\s*"([^"]*)"/);
-    const s3SecretKeyMatch = yamlContent.match(/secret_key:\s*"([^"]*)"/);
-    
-    if (s3NameMatch && s3NameMatch[1]) s3Config.name = s3NameMatch[1];
-    if (s3AccessKeyMatch && s3AccessKeyMatch[1]) s3Config.access_key = s3AccessKeyMatch[1];
-    if (s3SecretKeyMatch && s3SecretKeyMatch[1]) s3Config.secret_key = s3SecretKeyMatch[1];
-    
-    // Look for steps section
-    if (yamlContent.includes('steps:')) {
-      // Extract step blocks - more flexible approach
-      const stepRegex = /- name:\s*"([^"]*)"\s*(table:\s*"([^"]*)"\s*)?(database:\s*"([^"]*)"\s*)?execute:\s*"([^"]*)"/g;
-      let match;
-      
-      while ((match = stepRegex.exec(yamlContent)) !== null) {
-        const name = match[1];
-        const table = match[3] || null;
-        const database = match[5] || null;
-        const execute = match[6];
+    // Process steps to add the type field
+    let parsedSteps = [];
+    if (Array.isArray(parsedYaml.steps)) {
+      parsedSteps = parsedYaml.steps.map(step => {
+        const { name, execute, table, database } = step;
         
         let type = "Python"; // Default type
         
@@ -104,16 +96,10 @@ const loadConfig = async () => {
           type = "SQL Script";
         }
         
-        const step = { name, execute, type };
-        
-        if (table) step.table = table;
-        if (database) step.database = database;
-        
-        parsedSteps.push(step);
-      }
+        return { ...step, type };
+      });
     }
     
-    // Set state with parsed data
     setGlobalConfig({
       schedule,
       s3: s3Config
@@ -141,6 +127,10 @@ const loadConfig = async () => {
   }
 };
 
+
+
+
+  
  const saveConfig = async () => {
      try {
        setIsLoading(true);
