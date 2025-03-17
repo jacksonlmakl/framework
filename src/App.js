@@ -28,24 +28,24 @@ const loadConfig = async () => {
   try {
     setIsLoading(true);
     
-    // Check if controller.yaml exists first
+    // Use fetch to get the controller.yaml file
     const response = await fetch('/controller.yaml');
     
-    // If file doesn't exist, create default structure
+    // If file doesn't exist, create a default configuration
     if (response.status === 404) {
-      console.log("controller.yaml not found. Creating default config.");
-      const defaultSteps = [];
-      const defaultConfig = {
+      console.log("Creating new controller.yaml file with default structure");
+      
+      setGlobalConfig({
         schedule: '* * * * *',
         s3: {
           name: '',
           access_key: '',
           secret_key: ''
         }
-      };
+      });
       
-      setGlobalConfig(defaultConfig);
-      setSteps(defaultSteps);
+      setSteps([]);
+      setIsLoading(false);
       return;
     }
     
@@ -54,84 +54,66 @@ const loadConfig = async () => {
     }
     
     const yamlContent = await response.text();
+    console.log("Loaded YAML content:", yamlContent);
     
-    // Manual parsing of YAML
-    // Extract schedule
-    const scheduleMatch = yamlContent.match(/schedule: "([^"]*)"/);
-    const schedule = scheduleMatch ? scheduleMatch[1] : "";
-    
-    // Extract s3 configuration
-    const s3ConfigLines = yamlContent.match(/s3:[\s\S]*?(?=steps:|$)/);
-    if (!s3ConfigLines) {
-      throw new Error("Invalid YAML format: s3 section not found");
-    }
-    
-    const s3Config = {
+    // More flexible parsing approach
+    let schedule = '* * * * *'; // Default schedule
+    let s3Config = {
       name: '',
       access_key: '',
       secret_key: ''
     };
-    
-    const s3NameMatch = s3ConfigLines[0].match(/name: "([^"]*)"/);
-    const s3AccessKeyMatch = s3ConfigLines[0].match(/access_key: "([^"]*)"/);
-    const s3SecretKeyMatch = s3ConfigLines[0].match(/secret_key: "([^"]*)"/);
-    
-    if (s3NameMatch) s3Config.name = s3NameMatch[1];
-    if (s3AccessKeyMatch) s3Config.access_key = s3AccessKeyMatch[1];
-    if (s3SecretKeyMatch) s3Config.secret_key = s3SecretKeyMatch[1];
-    
-    // Extract steps
-    const stepsMatch = yamlContent.match(/steps:[\s\S]*/);
-    if (!stepsMatch) {
-      throw new Error("Invalid YAML format: steps section not found");
-    }
-    
-    const stepsSection = stepsMatch[0];
-    const stepBlocks = stepsSection.split(/\s{2}-\s/).slice(1);
-    
     let parsedSteps = [];
     
-    if (stepBlocks && stepBlocks.length > 0) {
-      parsedSteps = stepBlocks.map(block => {
-        const nameMatch = block.match(/name: "([^"]*)"/);
-        const executeMatch = block.match(/execute: "([^"]*)"/);
-        const tableMatch = block.match(/table: "([^"]*)"/);
-        const databaseMatch = block.match(/database: "([^"]*)"/);
-        
-        if (!nameMatch || !executeMatch) {
-          console.warn("Found step with missing required fields:", block);
-          return null;
-        }
-        
-        const name = nameMatch[1];
-        const execute = executeMatch[1];
+    // Extract schedule
+    const scheduleMatch = yamlContent.match(/schedule:\s*"([^"]*)"/);
+    if (scheduleMatch && scheduleMatch[1]) {
+      schedule = scheduleMatch[1];
+    }
+    
+    // Extract s3 config - make this more flexible
+    const s3NameMatch = yamlContent.match(/name:\s*"([^"]*)"/);
+    const s3AccessKeyMatch = yamlContent.match(/access_key:\s*"([^"]*)"/);
+    const s3SecretKeyMatch = yamlContent.match(/secret_key:\s*"([^"]*)"/);
+    
+    if (s3NameMatch && s3NameMatch[1]) s3Config.name = s3NameMatch[1];
+    if (s3AccessKeyMatch && s3AccessKeyMatch[1]) s3Config.access_key = s3AccessKeyMatch[1];
+    if (s3SecretKeyMatch && s3SecretKeyMatch[1]) s3Config.secret_key = s3SecretKeyMatch[1];
+    
+    // Look for steps section
+    if (yamlContent.includes('steps:')) {
+      // Extract step blocks - more flexible approach
+      const stepRegex = /- name:\s*"([^"]*)"\s*(table:\s*"([^"]*)"\s*)?(database:\s*"([^"]*)"\s*)?execute:\s*"([^"]*)"/g;
+      let match;
+      
+      while ((match = stepRegex.exec(yamlContent)) !== null) {
+        const name = match[1];
+        const table = match[3] || null;
+        const database = match[5] || null;
+        const execute = match[6];
         
         let type = "Python"; // Default type
         
         if (execute === "s3") {
           type = "S3 Upload";
-        } else if (tableMatch && execute.endsWith(".json")) {
+        } else if (table && execute.endsWith(".json")) {
           type = "SQL Insert";
-        } else if (tableMatch && execute.endsWith(".sql")) {
+        } else if (table && execute.endsWith(".sql")) {
           type = "SQL Query";
-        } else if (databaseMatch && execute.endsWith(".sql")) {
+        } else if (database && execute.endsWith(".sql")) {
           type = "SQL Script";
         }
         
         const step = { name, execute, type };
         
-        if (tableMatch) {
-          step.table = tableMatch[1];
-        }
+        if (table) step.table = table;
+        if (database) step.database = database;
         
-        if (databaseMatch) {
-          step.database = databaseMatch[1];
-        }
-        
-        return step;
-      }).filter(step => step !== null);
+        parsedSteps.push(step);
+      }
     }
     
+    // Set state with parsed data
     setGlobalConfig({
       schedule,
       s3: s3Config
@@ -143,7 +125,7 @@ const loadConfig = async () => {
     console.error("Error loading configuration:", error);
     alert(`Error loading configuration: ${error.message}`);
     
-    // Set defaults if there's an error
+    // Set defaults on error
     setGlobalConfig({
       schedule: '* * * * *',
       s3: {
@@ -158,55 +140,6 @@ const loadConfig = async () => {
     setIsLoading(false);
   }
 };
-
-  const saveConfig = async () => {
-    try {
-      setIsLoading(true);
-      
-      // Format the s3 configuration as an array of objects for YAML output
-      const s3Array = [
-        { name: globalConfig.s3.name },
-        { access_key: globalConfig.s3.access_key },
-        { secret_key: globalConfig.s3.secret_key }
-      ];
-      
-      // Prepare steps without the type field (since it's not in the file format)
-      const cleanSteps = steps.map(step => {
-        const { type, ...cleanStep } = step;
-        return cleanStep;
-      });
-      
-      // Create the config object
-      const configToSave = {
-        schedule: globalConfig.schedule,
-        s3: s3Array,
-        steps: cleanSteps
-      };
-      
-      // Convert to YAML
-      const yamlContent = yaml.dump(configToSave);
-      
-      // Use fetch to save the controller.yaml file
-      const response = await fetch('/save-config', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ content: yamlContent }),
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to save configuration: ${response.status} ${response.statusText}`);
-      }
-      
-      alert("Configuration saved to controller.yaml");
-    } catch (error) {
-      console.error("Error saving configuration:", error);
-      alert(`Error saving configuration: ${error.message}`);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const executeTerminalCommand = async (command, successMessage) => {
     try {
