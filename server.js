@@ -71,7 +71,7 @@ app.post('/execute-command', (req, res) => {
   const allowedCommands = [
     './bin/run',
     './bin/deploy',
-    '.../bin/deploy',
+    'echo $(pwd)',
     'sudo docker stop framework-scheduler',
     'sudo docker logs framework-scheduler'
   ];
