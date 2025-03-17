@@ -307,107 +307,140 @@ const loadConfig = async () => {
     );
   };
 
-  const StepEditForm = ({ step, index }) => {
-    const [formData, setFormData] = useState({...step});
-    
-    const handleChange = (e) => {
-      setFormData({
-        ...formData,
-        [e.target.name]: e.target.value
-      });
+const StepEditForm = ({ step, index }) => {
+  const [formData, setFormData] = useState({...step});
+  
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    });
+  };
+  
+  const handleTypeChange = (e) => {
+    const newType = e.target.value;
+    let updatedForm = {
+      ...formData,
+      type: newType,
+      name: formData.name,
+      execute: formData.execute
     };
     
-    const handleTypeChange = (e) => {
-      const newType = e.target.value;
-      let updatedForm = {
-        ...formData,
-        type: newType,
-        name: formData.name,
-        execute: formData.execute
-      };
-      
-      // Reset fields based on type
-      if (newType === "Python") {
-        delete updatedForm.table;
-        delete updatedForm.database;
-      } else if (newType === "SQL Insert" || newType === "SQL Query") {
-        updatedForm.table = formData.table || "";
-        delete updatedForm.database;
-      } else if (newType === "SQL Script") {
-        delete updatedForm.table;
-        updatedForm.database = formData.database || "";
-      } else if (newType === "S3 Upload") {
-        delete updatedForm.table;
-        delete updatedForm.database;
-        updatedForm.execute = "s3";
-      }
-      
-      setFormData(updatedForm);
-    };
+    // Reset fields based on type
+    if (newType === "Python") {
+      delete updatedForm.table;
+      delete updatedForm.database;
+    } else if (newType === "SQL Insert" || newType === "SQL Query") {
+      updatedForm.table = formData.table || "";
+      delete updatedForm.database;
+    } else if (newType === "SQL Script") {
+      delete updatedForm.table;
+      updatedForm.database = formData.database || "";
+    } else if (newType === "S3 Upload") {
+      delete updatedForm.table;
+      delete updatedForm.database;
+      updatedForm.execute = "s3";
+    }
     
-    const handleSave = () => {
-      updateStep(index, formData);
-      setEditingStepIndex(null);
-    };
-    
+    setFormData(updatedForm);
+  };
+  
+  const handleSave = () => {
+    updateStep(index, formData);
+    setEditingStepIndex(null);
+  };
+  
   return (
-
     <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 overflow-y-auto p-4">
-
       <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto relative">
-
         <div className="flex justify-between items-center mb-4 sticky top-0 bg-white z-10">
-
           <h2 className="text-xl font-semibold">Edit Step</h2>
-
           <button 
-
             onClick={() => setEditingStepIndex(null)} 
-
             className="text-gray-500 hover:text-gray-700"
-
           >
-
             <X size={20} />
-
           </button>
-
         </div>
-
         
-
-        {/* Form content */}
-
         <div className="space-y-4">
-
-          {/* ... existing form content ... */}
-
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Step Type</label>
+            <select 
+              name="type" 
+              value={formData.type} 
+              onChange={handleTypeChange}
+              className="w-full p-2 border border-gray-300 rounded"
+            >
+              <option value="Python">Python</option>
+              <option value="SQL Insert">SQL Insert</option>
+              <option value="SQL Query">SQL Query</option>
+              <option value="SQL Script">SQL Script</option>
+              <option value="S3 Upload">S3 Upload</option>
+            </select>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+            <input 
+              type="text" 
+              name="name" 
+              value={formData.name} 
+              onChange={handleChange}
+              className="w-full p-2 border border-gray-300 rounded" 
+            />
+          </div>
+          
+          {(formData.type === "SQL Insert" || formData.type === "SQL Query") && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Table</label>
+              <input 
+                type="text" 
+                name="table" 
+                value={formData.table || ""} 
+                onChange={handleChange}
+                className="w-full p-2 border border-gray-300 rounded" 
+              />
+            </div>
+          )}
+          
+          {formData.type === "SQL Script" && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Database</label>
+              <input 
+                type="text" 
+                name="database" 
+                value={formData.database || ""} 
+                onChange={handleChange}
+                className="w-full p-2 border border-gray-300 rounded" 
+              />
+            </div>
+          )}
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Execute</label>
+            <input 
+              type="text" 
+              name="execute" 
+              value={formData.execute} 
+              onChange={handleChange}
+              className="w-full p-2 border border-gray-300 rounded"
+              disabled={formData.type === "S3 Upload"}
+            />
+          </div>
         </div>
-
         
-
         <div className="mt-6 flex justify-end sticky bottom-0 bg-white z-10 pt-2">
-
           <button 
-
             onClick={handleSave}
-
             className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-
           >
-
             Save Changes
-
           </button>
-
         </div>
-
       </div>
-
     </div>
-
   );
-
 };
 
   const SettingsModal = () => {
@@ -448,8 +481,58 @@ const loadConfig = async () => {
         </div>
         
         {/* Form content */}
-        <div className="space-y-4">
-          {/* ... existing form content ... */}
+<div className="space-y-4">
+  <div>
+    <label className="block text-sm font-medium text-gray-700 mb-1">Schedule</label>
+    <input 
+      type="text" 
+      name="schedule" 
+      value={settings.schedule} 
+      onChange={handleChange}
+      className="w-full p-2 border border-gray-300 rounded" 
+    />
+    <p className="text-xs text-gray-500 mt-1">Format: "* * * * *" (minute hour day month weekday)</p>
+  </div>
+  
+  <div className="border-t pt-4">
+    <h3 className="font-medium mb-2">S3 Connection Parameters</h3>
+    
+    <div className="space-y-3">
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Bucket Name</label>
+        <input 
+          type="text" 
+          name="s3.name" 
+          value={settings.s3.name} 
+          onChange={handleChange}
+          className="w-full p-2 border border-gray-300 rounded" 
+        />
+      </div>
+      
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Access Key</label>
+        <input 
+          type="password" 
+          name="s3.access_key" 
+          value={settings.s3.access_key} 
+          onChange={handleChange}
+          className="w-full p-2 border border-gray-300 rounded" 
+        />
+      </div>
+      
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Secret Key</label>
+        <input 
+          type="password" 
+          name="s3.secret_key" 
+          value={settings.s3.secret_key} 
+          onChange={handleChange}
+          className="w-full p-2 border border-gray-300 rounded" 
+        />
+      </div>
+    </div>
+  </div>
+</div>
         </div>
         
         <div className="mt-6 flex justify-end sticky bottom-0 bg-white z-10 pt-2">
