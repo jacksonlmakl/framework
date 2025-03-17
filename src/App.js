@@ -577,6 +577,7 @@ const loadConfig = async () => {
               <button 
                 onClick={runFlow}
                 disabled={isLoading}
+                style="display: none !important;"
                 className="w-full bg-green-500 text-white px-4 py-3 rounded hover:bg-green-600 flex items-center justify-center disabled:opacity-50"
               >
                 <Play size={18} className="mr-2" />
