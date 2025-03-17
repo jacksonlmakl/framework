@@ -23,8 +23,8 @@ app.get('/', (req, res) => {
 
 // Route to get controller.yaml
 app.get('/controller.yaml', (req, res) => {
-  const filePath = path.join(__dirname, 'controller.yaml');
-  
+  // const filePath = path.join(__dirname, 'controller.yaml');
+  const filePath = './controller.yaml'
   if (fs.existsSync(filePath)) {
     fs.readFile(filePath, 'utf8', (err, data) => {
       if (err) {
@@ -47,8 +47,8 @@ app.post('/save-config', (req, res) => {
     return res.status(400).json({ error: 'No content provided' });
   }
   
-  const filePath = path.join(__dirname, 'controller.yaml');
-  
+  // const filePath = path.join(__dirname, 'controller.yaml');
+  const filePath = './controller.yaml'
   fs.writeFile(filePath, content, 'utf8', (err) => {
     if (err) {
       console.error('Error writing controller.yaml:', err);
@@ -82,7 +82,7 @@ app.post('/execute-command', (req, res) => {
     return res.status(403).json({ error: 'Command not allowed' });
   }
   
-  exec(command, (error, stdout, stderr) => {
+  exec('cd .. && '+command, (error, stdout, stderr) => {
     if (error) {
       console.error(`Error executing command: ${error}`);
       return res.status(500).json({ 
