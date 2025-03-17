@@ -1,4 +1,8 @@
 # Quick Start
+### React App
+git clone https://github.com/jacksonlmakl/framework.git && cd framework && npm install && npm run dev
+
+### CLI
 ### Clone Repo & Deploy Controller Based On Model
 ``` git clone https://github.com/jacksonlmakl/framework.git && cd framework && sudo ./bin/deploy ```
 ### View Logs From Controller
