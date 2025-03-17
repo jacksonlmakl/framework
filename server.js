@@ -19,6 +19,8 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'build', 'index.html'));
 });
 
+// Make sure your server.js has these correct API endpoints
+
 // Route to get controller.yaml
 app.get('/controller.yaml', (req, res) => {
   const filePath = path.join(__dirname, 'controller.yaml');
