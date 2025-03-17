@@ -238,11 +238,11 @@ const loadConfig = async () => {
   };
 
   const stopFlow = () => {
-    executeTerminalCommand('docker stop framework-scheduler', 'Flow stopped successfully');
+    executeTerminalCommand('source bin/docker-stop', 'Flow stopped successfully');
   };
 
   const viewLogs = () => {
-    executeTerminalCommand('docker logs framework-scheduler', 'Logs retrieved successfully');
+    executeTerminalCommand('source bin/docker-logs', 'Logs retrieved successfully');
   };
 
   const addStep = () => {
