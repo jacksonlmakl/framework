@@ -304,19 +304,19 @@ const LogsModal = () => {
   };
 
   const runFlow = () => {
-    executeTerminalCommand('source bin/run', 'Flow started successfully');
+    executeTerminalCommand('bash bin/run', 'Flow started successfully');
   };
 
   const deployFlow = () => {
-    executeTerminalCommand('source bin/deploy', 'Flow deployed successfully');
+    executeTerminalCommand('bash bin/deploy', 'Flow deployed successfully');
   };
 
   const stopFlow = () => {
-    executeTerminalCommand('source bin/docker-stop', 'Flow stopped successfully');
+    executeTerminalCommand('bash bin/docker-stop', 'Flow stopped successfully');
   };
 
   const viewLogs = () => {
-    executeTerminalCommand('source bin/docker-logs', 'Logs retrieved successfully');
+    executeTerminalCommand('bash bin/docker-logs', 'Logs retrieved successfully');
   };
 
   const addStep = () => {
