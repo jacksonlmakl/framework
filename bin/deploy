@@ -28,32 +28,32 @@ install_docker_debian() {
   echo "Installing Docker on Debian-based system..."
   
   # Update package index
-  sudo apt-get update
+  apt-get update
   
   # Install dependencies
-  sudo apt-get install -y \
+  apt-get install -y \
     ca-certificates \
     curl \
     gnupg \
     lsb-release
 
   # Add Docker's official GPG key
-  sudo mkdir -p /etc/apt/keyrings
-  curl -fsSL https://download.docker.com/linux/$(lsb_release -is | tr '[:upper:]' '[:lower:]')/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+  mkdir -p /etc/apt/keyrings
+  curl -fsSL https://download.docker.com/linux/$(lsb_release -is | tr '[:upper:]' '[:lower:]')/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
   
   # Set up the Docker repository
   echo \
     "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/$(lsb_release -is | tr '[:upper:]' '[:lower:]') \
-    $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+    $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
   
   # Update apt package index
-  sudo apt-get update
+  apt-get update
   
   # Install Docker Engine
-  sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+  apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
   
   # Add current user to the docker group
-  sudo usermod -aG docker root
+  usermod -aG docker root
   
   echo "Docker installed successfully"
 }
@@ -63,22 +63,24 @@ install_docker_redhat() {
   echo "Installing Docker on Red Hat-based system..."
   
   # Install required packages
-  sudo yum install -y yum-utils
+  yum install -y yum-utils
   
   # Add Docker repository
-  sudo yum-config-manager --add-repo https://download.docker.com/linux/$(. /etc/os-release; echo "$ID")/docker-ce.repo
+  yum-config-manager --add-repo https://download.docker.com/linux/$(. /etc/os-release; echo "$ID")/docker-ce.repo
   
   # Install Docker Engine
-  sudo yum install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+  yum install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
   
   # Start Docker
-  sudo systemctl start docker
-  
-  # Enable Docker to start on boot
-  sudo systemctl enable docker
+  if command -v systemctl &> /dev/null; then
+    systemctl start docker || service docker start
+    systemctl enable docker || true
+  elif command -v service &> /dev/null; then
+    service docker start
+  fi
   
   # Add current user to the docker group
-  sudo usermod -aG docker root
+  usermod -aG docker root
   
   echo "Docker installed successfully"
 }
@@ -88,16 +90,18 @@ install_docker_amazon() {
   echo "Installing Docker on Amazon Linux..."
   
   # Update packages
-  sudo amazon-linux-extras install docker -y
+  amazon-linux-extras install docker -y
   
   # Start Docker
-  sudo service docker start
+  service docker start || true
   
   # Enable Docker to start on boot
-  sudo systemctl enable docker
+  if command -v systemctl &> /dev/null; then
+    systemctl enable docker || true
+  fi
   
   # Add current user to the docker group
-  sudo usermod -aG docker root
+  usermod -aG docker root
   
   echo "Docker installed successfully"
 }
@@ -130,15 +134,14 @@ ensure_docker_permissions() {
   echo "⚠️ Docker permission issues detected. Attempting to fix..."
   
   # Try to add the current user to the docker group again
-  sudo usermod -aG docker root
+  usermod -aG docker root || true
   
   # Try to apply group changes without requiring logout
   if command -v newgrp &> /dev/null; then
     echo "🔄 Applying group changes with newgrp..."
-    # We need to create a subshell, run newgrp, and then continue the script
-    exec sg docker -c "$0"
-    # This will restart the script with docker group permissions
-    # The script will not reach this point in the parent process
+    # Since we can't restart the script within itself easily in non-interactive mode,
+    # we'll just set USE_SUDO=1 and continue
+    export USE_SUDO=1
   else
     # If newgrp is not available, try directly with sudo for this session
     echo "⚠️ Unable to automatically apply group changes"
@@ -146,6 +149,13 @@ ensure_docker_permissions() {
     export USE_SUDO=1
   fi
 }
+
+# Check if running as root
+if [ "$(id -u)" -ne 0 ]; then
+  echo "⚠️ This script requires root privileges to install Docker."
+  echo "Please run with sudo or as root."
+  exit 1
+fi
 
 # Main Docker installation script
 if ! check_docker_installed; then
@@ -178,12 +188,12 @@ if ! check_docker_installed; then
         ;;
     esac
     
-    # Ensure Docker service is running
+    # Ensure Docker service is running - with fallbacks
     if command -v systemctl &> /dev/null; then
-      sudo systemctl start docker
-      sudo systemctl enable docker
+      systemctl start docker || service docker start || true
+      systemctl enable docker || true
     elif command -v service &> /dev/null; then
-      sudo service docker start
+      service docker start || true
     fi
     
     echo "✅ Docker installed. Ensuring permissions..."
@@ -204,7 +214,7 @@ USE_SUDO=${USE_SUDO:-0}
 # Function to run docker commands with or without sudo as needed
 run_docker() {
   if [ "$USE_SUDO" -eq 1 ]; then
-    sudo docker "$@"
+    docker "$@" || sudo docker "$@"
   else
     docker "$@"
   fi
@@ -224,9 +234,9 @@ FROM ubuntu:22.04
 # Set non-interactive mode for apt
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install Python and dependencies including cron and jq
+# Install Python and dependencies
 RUN apt-get update && \
-    apt-get install -y python3 python3-pip wget curl jq cron && \
+    apt-get install -y --no-install-recommends python3 python3-pip wget curl jq cron && \
     ln -s /usr/bin/python3 /usr/bin/python && \
     pip3 install --upgrade pip
 
@@ -270,8 +280,8 @@ else\n\
     echo "⚠️ No schedule found in controller.yaml, will run once now and then stay idle"\n\
 fi\n\
 \n\
-# Start cron service\n\
-service cron start\n\
+# Start cron service - do not use systemd which is not available in containers\n\
+/etc/init.d/cron start\n\
 echo "✅ Cron service started"\n\
 \n\
 # Run once immediately\n\
@@ -280,6 +290,7 @@ echo "🚀 Running initial execution..."\n\
 \n\
 # Keep container running\n\
 echo "🔄 Container will remain running for scheduled executions"\n\
+touch /app/cron.log\n\
 tail -f /app/cron.log\n\
 ' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
@@ -317,5 +328,4 @@ else
     echo "❌ Docker image build failed."
     exit 1
 fi
-
 
