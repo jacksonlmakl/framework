@@ -1,7 +1,7 @@
+
 #!/bin/bash
 
 # deploy.sh - Script to build Docker image for the framework and run as a scheduled service
-# Modified for Docker-in-Docker compatibility
 
 # Exit on error
 set -e
@@ -12,49 +12,6 @@ IMAGE_TAG="latest"
 CONTAINER_NAME="framework-scheduler"
 
 echo "🔍 Checking environment..."
-
-# Check if inside a container
-is_in_container() {
-  if [ -f /.dockerenv ]; then
-    return 0  # True, we are in a container
-  else
-    return 1  # False, not in a container
-  fi
-}
-
-# Function to start Docker daemon (for Docker-in-Docker)
-start_docker_daemon() {
-  echo "🐳 Starting Docker daemon (Docker-in-Docker)..."
-  
-  # Create necessary directories
-  mkdir -p /var/run
-  
-  # Check if Docker daemon is already running
-  if docker info &>/dev/null; then
-    echo "✅ Docker daemon already running"
-    return 0
-  fi
-  
-  # Start Docker daemon in the background
-  echo "🚀 Starting Docker daemon in the background..."
-  nohup dockerd --host=unix:///var/run/docker.sock --host=tcp://0.0.0.0:2375 &>/var/log/dockerd.log &
-  DOCKER_PID=$!
-  
-  # Wait for Docker daemon to be responsive
-  echo "⏳ Waiting for Docker daemon to start..."
-  TIMEOUT=30
-  for i in $(seq 1 $TIMEOUT); do
-    if docker info &>/dev/null; then
-      echo "✅ Docker daemon started successfully!"
-      return 0
-    fi
-    echo -n "."
-    sleep 1
-  done
-  
-  echo "❌ Failed to start Docker daemon within timeout period"
-  return 1
-}
 
 # Function to check if Docker is installed
 check_docker_installed() {
@@ -72,32 +29,32 @@ install_docker_debian() {
   echo "Installing Docker on Debian-based system..."
   
   # Update package index
-  apt-get update
+  sudo apt-get update
   
   # Install dependencies
-  apt-get install -y \
+  sudo apt-get install -y \
     ca-certificates \
     curl \
     gnupg \
     lsb-release
 
   # Add Docker's official GPG key
-  mkdir -p /etc/apt/keyrings
-  curl -fsSL https://download.docker.com/linux/$(lsb_release -is | tr '[:upper:]' '[:lower:]')/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+  sudo mkdir -p /etc/apt/keyrings
+  curl -fsSL https://download.docker.com/linux/$(lsb_release -is | tr '[:upper:]' '[:lower:]')/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
   
   # Set up the Docker repository
   echo \
     "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/$(lsb_release -is | tr '[:upper:]' '[:lower:]') \
-    $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+    $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
   
   # Update apt package index
-  apt-get update
+  sudo apt-get update
   
   # Install Docker Engine
-  apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+  sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
   
   # Add current user to the docker group
-  usermod -aG docker root
+  sudo usermod -aG docker root
   
   echo "Docker installed successfully"
 }
@@ -107,36 +64,22 @@ install_docker_redhat() {
   echo "Installing Docker on Red Hat-based system..."
   
   # Install required packages
-  yum install -y yum-utils
+  sudo yum install -y yum-utils
   
   # Add Docker repository
-  yum-config-manager --add-repo https://download.docker.com/linux/$(. /etc/os-release; echo "$ID")/docker-ce.repo
+  sudo yum-config-manager --add-repo https://download.docker.com/linux/$(. /etc/os-release; echo "$ID")/docker-ce.repo
   
   # Install Docker Engine
-  yum install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+  sudo yum install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
   
   # Start Docker
-  if command -v docker &> /dev/null; then
-    # Check if Docker daemon is running
-    if ! docker info &> /dev/null; then
-      echo "Starting Docker daemon..."
-      # Try to start Docker daemon
-      if is_in_container; then
-        start_docker_daemon
-      elif command -v service &> /dev/null; then
-        service docker start || /etc/init.d/docker start 2>/dev/null || start_docker_daemon
-      else
-        start_docker_daemon
-      fi
-    fi
-    echo "Docker is running"
-  else
-    echo "Docker command not found. Please install Docker first."
-    exit 1
-  fi
+  sudo systemctl start docker
+  
+  # Enable Docker to start on boot
+  sudo systemctl enable docker
   
   # Add current user to the docker group
-  usermod -aG docker root
+  sudo usermod -aG docker root
   
   echo "Docker installed successfully"
 }
@@ -146,30 +89,16 @@ install_docker_amazon() {
   echo "Installing Docker on Amazon Linux..."
   
   # Update packages
-  amazon-linux-extras install docker -y
+  sudo amazon-linux-extras install docker -y
   
   # Start Docker
-  if is_in_container; then
-    start_docker_daemon
-  else
-    service docker start || /etc/init.d/docker start 2>/dev/null || start_docker_daemon
-  fi
+  sudo service docker start
   
-  # Enable Docker to start at boot
-  # Attempt to enable Docker to start at boot without systemd
-  if command -v chkconfig &> /dev/null; then
-    # For older Red Hat-based systems
-    chkconfig docker on || true
-  elif [ -d "/etc/docker" ] || mkdir -p /etc/docker 2>/dev/null; then
-    # Create a note that we would have enabled docker
-    echo "# Docker was set to start on boot" > /etc/docker/startup-enabled 2>/dev/null || true
-    echo "Docker service marked to start on boot"
-  else
-    echo "Note: Docker auto-start at boot would have been enabled"
-  fi
+  # Enable Docker to start on boot
+  sudo systemctl enable docker
   
   # Add current user to the docker group
-  usermod -aG docker root
+  sudo usermod -aG docker root
   
   echo "Docker installed successfully"
 }
@@ -202,20 +131,15 @@ ensure_docker_permissions() {
   echo "⚠️ Docker permission issues detected. Attempting to fix..."
   
   # Try to add the current user to the docker group again
-  usermod -aG docker root || true
-  
-  # Check if Docker sock exists and fix permissions
-  if [ -S /var/run/docker.sock ]; then
-    echo "🔧 Setting permissions on Docker socket..."
-    chmod 666 /var/run/docker.sock || true
-  fi
+  sudo usermod -aG docker root
   
   # Try to apply group changes without requiring logout
   if command -v newgrp &> /dev/null; then
     echo "🔄 Applying group changes with newgrp..."
-    # Since we can't restart the script within itself easily in non-interactive mode,
-    # we'll just set USE_SUDO=1 and continue
-    export USE_SUDO=1
+    # We need to create a subshell, run newgrp, and then continue the script
+    exec sg docker -c "$0"
+    # This will restart the script with docker group permissions
+    # The script will not reach this point in the parent process
   else
     # If newgrp is not available, try directly with sudo for this session
     echo "⚠️ Unable to automatically apply group changes"
@@ -224,43 +148,8 @@ ensure_docker_permissions() {
   fi
 }
 
-# Check if running as root
-if [ "$(id -u)" -ne 0 ]; then
-  echo "⚠️ This script requires root privileges to install Docker."
-  echo "Please run with sudo or as root."
-  exit 1
-fi
-
-# First check if we're in a container and need to start Docker daemon
-if is_in_container; then
-  echo "🐳 Detected container environment, using Docker-in-Docker mode"
-  if ! check_docker_installed; then
-    echo "❌ Docker not installed in the container. Installing Docker first..."
-    # Detect Linux distribution
-    if [ -f /etc/os-release ]; then
-      source /etc/os-release
-      case "$ID" in
-        ubuntu|debian|pop|elementary|mint|kali|zorin)
-          install_docker_debian
-          ;;
-        centos|fedora|rhel|rocky|almalinux|ol)
-          install_docker_redhat
-          ;;
-        amzn)
-          install_docker_amazon
-          ;;
-        *)
-          echo "⚠️ Unsupported Linux distribution: $ID"
-          echo "Please install Docker manually for your distribution"
-          exit 1
-          ;;
-      esac
-    fi
-  else
-    # Docker is installed, start it directly
-    start_docker_daemon
-  fi
-elif ! check_docker_installed; then
+# Main Docker installation script
+if ! check_docker_installed; then
   echo "🔍 Docker not found. Installing..."
   
   # Detect operating system
@@ -290,30 +179,12 @@ elif ! check_docker_installed; then
         ;;
     esac
     
-    # Ensure Docker service is running - with fallbacks
-    if command -v docker &> /dev/null; then
-      # Check if Docker daemon is running
-      if ! docker info &> /dev/null; then
-        echo "Starting Docker daemon..."
-        if command -v service &> /dev/null; then
-          service docker start || /etc/init.d/docker start 2>/dev/null || start_docker_daemon
-        else
-          # Direct start of Docker daemon as a fallback
-          start_docker_daemon
-        fi
-      fi
-      
-      # Try to enable Docker at boot without systemd
-      if command -v chkconfig &> /dev/null; then
-        chkconfig docker on || true
-      elif [ -d "/etc/docker" ] || mkdir -p /etc/docker 2>/dev/null; then
-        echo "# Docker was set to start on boot" > /etc/docker/startup-enabled 2>/dev/null || true
-      fi
-      
-      echo "Docker is running"
-    else
-      echo "Docker command not found. Please install Docker first."
-      exit 1
+    # Ensure Docker service is running
+    if command -v systemctl &> /dev/null; then
+      sudo systemctl start docker
+      sudo systemctl enable docker
+    elif command -v service &> /dev/null; then
+      sudo service docker start
     fi
     
     echo "✅ Docker installed. Ensuring permissions..."
@@ -324,19 +195,7 @@ elif ! check_docker_installed; then
     exit 1
   fi
 else
-  # Docker is installed, but we need to check if it's running
-  if ! docker info &> /dev/null; then
-    echo "🔍 Docker installed but not running. Starting Docker..."
-    if is_in_container; then
-      start_docker_daemon
-    elif command -v service &> /dev/null; then
-      service docker start || /etc/init.d/docker start 2>/dev/null || start_docker_daemon
-    else
-      start_docker_daemon
-    fi
-  fi
-  
-  # Check permissions
+  # Docker is installed, but we need to check permissions
   ensure_docker_permissions
 fi
 
@@ -346,7 +205,7 @@ USE_SUDO=${USE_SUDO:-0}
 # Function to run docker commands with or without sudo as needed
 run_docker() {
   if [ "$USE_SUDO" -eq 1 ]; then
-    docker "$@" || sudo docker "$@"
+    sudo docker "$@"
   else
     docker "$@"
   fi
@@ -366,9 +225,9 @@ FROM ubuntu:22.04
 # Set non-interactive mode for apt
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install Python and dependencies
+# Install Python and dependencies including cron and jq
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends python3 python3-pip wget curl jq cron && \
+    apt-get install -y python3 python3-pip wget curl jq cron && \
     ln -s /usr/bin/python3 /usr/bin/python && \
     pip3 install --upgrade pip
 
@@ -412,8 +271,8 @@ else\n\
     echo "⚠️ No schedule found in controller.yaml, will run once now and then stay idle"\n\
 fi\n\
 \n\
-# Start cron service - do not use systemd which is not available in containers\n\
-/etc/init.d/cron start || cron || true\n\
+# Start cron service\n\
+service cron start\n\
 echo "✅ Cron service started"\n\
 \n\
 # Run once immediately\n\
@@ -422,7 +281,6 @@ echo "🚀 Running initial execution..."\n\
 \n\
 # Keep container running\n\
 echo "🔄 Container will remain running for scheduled executions"\n\
-touch /app/cron.log\n\
 tail -f /app/cron.log\n\
 ' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
@@ -460,3 +318,5 @@ else
     echo "❌ Docker image build failed."
     exit 1
 fi
+
+
