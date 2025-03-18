@@ -53,7 +53,7 @@ install_docker_debian() {
   sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
   
   # Add current user to the docker group
-  sudo usermod -aG docker $USER
+  sudo usermod -aG docker root
   
   echo "Docker installed successfully"
 }
@@ -78,7 +78,7 @@ install_docker_redhat() {
   sudo systemctl enable docker
   
   # Add current user to the docker group
-  sudo usermod -aG docker $USER
+  sudo usermod -aG docker root
   
   echo "Docker installed successfully"
 }
@@ -97,7 +97,7 @@ install_docker_amazon() {
   sudo systemctl enable docker
   
   # Add current user to the docker group
-  sudo usermod -aG docker $USER
+  sudo usermod -aG docker root
   
   echo "Docker installed successfully"
 }
@@ -130,7 +130,7 @@ ensure_docker_permissions() {
   echo "⚠️ Docker permission issues detected. Attempting to fix..."
   
   # Try to add the current user to the docker group again
-  sudo usermod -aG docker $USER
+  sudo usermod -aG docker root
   
   # Try to apply group changes without requiring logout
   if command -v newgrp &> /dev/null; then
