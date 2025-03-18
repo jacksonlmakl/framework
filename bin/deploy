@@ -16,6 +16,44 @@ IMAGE_NAME="framework"
 IMAGE_TAG="latest"
 CONTAINER_NAME="framework-scheduler"
 
+# Check if Docker is installed, if not install it
+if ! command -v docker &> /dev/null; then
+    echo "🔍 Docker not found. Installing Docker CLI..."
+    
+    # Update package lists
+    apt-get update -qq
+    
+    # Install prerequisites
+    apt-get install -y -qq apt-transport-https ca-certificates curl gnupg lsb-release
+    
+    # Add Docker's official GPG key
+    mkdir -p /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    
+    # Set up the Docker repository
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+    
+    # Install Docker CLI only (not the full engine)
+    apt-get update -qq
+    apt-get install -y -qq docker-ce-cli
+    
+    echo "✅ Docker CLI installed successfully"
+    
+    # Check if we're running inside a container
+    if [ -f /.dockerenv ]; then
+        echo "🐳 Detected Docker-in-Docker environment"
+        
+        # Check if Docker socket exists from host mount
+        if [ ! -S /var/run/docker.sock ]; then
+            echo "⚠️ Docker socket not found. Please run the container with '-v /var/run/docker.sock:/var/run/docker.sock'"
+            echo "⚠️ Attempting to continue, but build may fail..."
+        else
+            # Fix permissions on Docker socket if needed
+            chmod 666 /var/run/docker.sock 2>/dev/null || true
+        fi
+    fi
+fi
+
 # Check if we're in the repository root directory
 if [ ! -d "./bin" ] || [ ! -f "./bin/run" ]; then
     echo "❌ Error: This script should be run from the repository root directory."
