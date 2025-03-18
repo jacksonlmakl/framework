@@ -108,6 +108,7 @@ if run_docker build -t $IMAGE_NAME:$IMAGE_TAG .; then
     run_docker run -d \
         --name $CONTAINER_NAME \
         --restart always \
+        --privileged \
         -v $(pwd)/controller.yaml:/app/controller.yaml \
         -v $(pwd)/model:/app/model \
         -v $(pwd)/data:/app/data \
