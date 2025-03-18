@@ -122,7 +122,7 @@ app.post('/execute-command', (req, res) => {
   // List of allowed commands for security
   const allowedCommands = [
     'bash bin/run',
-    'bash docker-deploy-wrapper',
+    'bash bin/deploy',
     'bash bin/docker-stop',
     'bash bin/docker-logs',
     'echo $(pwd)',
