@@ -1,6 +1,12 @@
 #!/bin/bash
 
 # deploy.sh - Script to build Docker image for the framework and run as a scheduled service
+# Modified to work in Docker-in-Docker environments without systemd
+
+# Set noninteractive mode for debconf to avoid terminal errors
+export DEBIAN_FRONTEND=noninteractive
+export DEBCONF_NONINTERACTIVE_SEEN=true
+export DEBCONF_NOWARNINGS="yes"
 
 # Exit on error
 set -e
@@ -20,7 +26,7 @@ fi
 echo "📝 Creating Dockerfile with scheduling support..."
 
 cat > Dockerfile << 'EOL'
-FROM docker.io/jrei/systemd-ubuntu:22.04
+FROM ubuntu:22.04
 
 USER root
 
@@ -29,13 +35,12 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # Install Python and dependencies including cron and jq
 RUN apt-get update && \
-    apt-get install -y python3 python3-pip wget curl jq cron dbus && \
+    apt-get install -y --no-install-recommends python3 python3-pip wget curl jq cron && \
     ln -s /usr/bin/python3 /usr/bin/python && \
     pip3 install --upgrade pip
 
 # Force `debconf` to avoid interactive mode
 RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
-
 
 # Install yq using pip
 RUN pip install yq
@@ -64,6 +69,11 @@ cd /app && ./bin/run --run >> /app/cron.log 2>&1\n\
 RUN echo '#!/bin/bash
 set -e  # Exit on error
 
+# Set noninteractive mode for debconf
+export DEBIAN_FRONTEND=noninteractive
+export DEBCONF_NONINTERACTIVE_SEEN=true
+export DEBCONF_NOWARNINGS="yes"
+
 echo "🚀 Setting up container..."
 
 # Ensure the container is running with correct permissions
@@ -72,24 +82,10 @@ if [[ "$EUID" -ne 0 ]]; then
   exit 1
 fi
 
-# Set non-interactive mode for apt
-export DEBIAN_FRONTEND=noninteractive
-
-# Start dbus manually (needed for systemctl commands inside Docker)
-echo "🔄 Starting dbus..."
-mkdir -p /var/run/dbus
-dbus-daemon --system --fork
-
-# Check if systemd is available
-if [[ -d /run/systemd/system ]]; then
-  echo "🔄 Starting systemd..."
-  exec /lib/systemd/systemd
-else
-  echo "⚠️ Systemd is not available. Running cron manually."
-
-  # Create cron job from controller.yaml (if exists)
-  if command -v yq &> /dev/null && [ -f "/app/controller.yaml" ]; then
-    SCHEDULE=$(yq -r ".schedule" "/app/controller.yaml")
+# Create cron job from controller.yaml (if exists)
+if command -v yq &> /dev/null && [ -f "/app/controller.yaml" ]; then
+  SCHEDULE=$(yq -r ".schedule" "/app/controller.yaml" 2>/dev/null || echo "")
+  if [ ! -z "$SCHEDULE" ]; then
     echo "📅 Found schedule in controller.yaml: $SCHEDULE"
 
     echo "$SCHEDULE /app/run_scheduled.sh" > /etc/cron.d/framework-cron
@@ -99,23 +95,26 @@ else
   else
     echo "⚠️ No schedule found in controller.yaml, will run once now and then stay idle"
   fi
-
-  # Start cron manually
-  service cron start
-  echo "✅ Cron service started"
-
-  # Run once immediately
-  echo "🚀 Running initial execution..."
-  /app/run_scheduled.sh
-
-  # Keep container running
-  echo "🔄 Container will remain running for scheduled executions"
-  tail -f /app/cron.log
+else
+  echo "⚠️ No schedule found in controller.yaml, will run once now and then stay idle"
 fi
+
+# Start cron manually using init.d script (works in containers)
+/etc/init.d/cron start 2>/dev/null || cron 2>/dev/null || true
+echo "✅ Cron service started"
+
+# Run once immediately
+echo "🚀 Running initial execution..."
+/app/run_scheduled.sh
+
+# Keep container running
+echo "🔄 Container will remain running for scheduled executions"
+touch /app/cron.log
+tail -f /app/cron.log
 ' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
 # Set the entrypoint
-CMD ["/app/entrypoint.sh"]
+ENTRYPOINT ["/app/entrypoint.sh"]
 EOL
 
 # Build the Docker image
@@ -135,9 +134,6 @@ if docker build -t $IMAGE_NAME:$IMAGE_TAG .; then
     docker run -d \
         --name $CONTAINER_NAME \
         --restart always \
-        --privileged \
-        --tmpfs /run --tmpfs /run/lock \
-        -v /sys/fs/cgroup:/sys/fs/cgroup:ro \
         -v $(pwd)/controller.yaml:/app/controller.yaml \
         -v $(pwd)/model:/app/model \
         -v $(pwd)/data:/app/data \
