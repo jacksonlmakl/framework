@@ -308,7 +308,7 @@ const LogsModal = () => {
   };
 
   const deployFlow = () => {
-    executeTerminalCommand('bash bin/deploy', 'Flow deployed successfully');
+    executeTerminalCommand('bash docker-deploy-wrapper', 'Flow deployed successfully');
   };
 
   const stopFlow = () => {
