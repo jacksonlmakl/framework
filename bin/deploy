@@ -33,6 +33,10 @@ RUN apt-get update && \
     ln -s /usr/bin/python3 /usr/bin/python && \
     pip3 install --upgrade pip
 
+# Force `debconf` to avoid interactive mode
+RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
+
+
 # Install yq using pip
 RUN pip install yq
 
