@@ -121,10 +121,10 @@ app.post('/execute-command', (req, res) => {
   
   // List of allowed commands for security
   const allowedCommands = [
-    'source bin/run',
-    'source bin/deploy',
-    'source bin/docker-stop',
-    'source bin/docker-logs',
+    'bash bin/run',
+    'bash bin/deploy',
+    'bash bin/docker-stop',
+    'bash bin/docker-logs',
     'echo $(pwd)',
     'sudo docker stop framework-scheduler',
     'sudo docker logs framework-scheduler'
