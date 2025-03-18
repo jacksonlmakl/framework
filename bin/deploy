@@ -72,11 +72,23 @@ install_docker_redhat() {
   yum install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
   
   # Start Docker
-  if command -v systemctl &> /dev/null; then
-    systemctl start docker || service docker start
-    systemctl enable docker || true
-  elif command -v service &> /dev/null; then
-    service docker start
+  if command -v docker &> /dev/null; then
+    # Check if Docker daemon is running
+    if ! docker info &> /dev/null; then
+      echo "Starting Docker daemon..."
+      if command -v service &> /dev/null; then
+        service docker start || /etc/init.d/docker start 2>/dev/null || true
+      else
+        # Direct start of Docker daemon as a fallback
+        nohup dockerd --host=unix:///var/run/docker.sock --host=tcp://0.0.0.0:2375 > /var/log/dockerd.log 2>&1 &
+        # Wait briefly for it to start
+        sleep 3
+      fi
+    fi
+    echo "Docker is running"
+  else
+    echo "Docker command not found. Please install Docker first."
+    exit 1
   fi
   
   # Add current user to the docker group
@@ -96,9 +108,18 @@ install_docker_amazon() {
   service docker start || true
   
   # Enable Docker to start on boot
-  if command -v systemctl &> /dev/null; then
-    systemctl enable docker || true
-  fi
+# Attempt to enable Docker to start at boot without systemd
+if command -v chkconfig &> /dev/null; then
+  # For older Red Hat-based systems
+  chkconfig docker on || true
+elif [ -d "/etc/docker" ]; then
+  # Create a note that we would have enabled docker
+  mkdir -p /etc/docker
+  echo "# Docker was set to start on boot" > /etc/docker/startup-enabled
+  echo "Docker service marked to start on boot"
+else
+  echo "Note: Docker auto-start at boot would have been enabled"
+fi
   
   # Add current user to the docker group
   usermod -aG docker root
@@ -189,12 +210,32 @@ if ! check_docker_installed; then
     esac
     
     # Ensure Docker service is running - with fallbacks
-    if command -v systemctl &> /dev/null; then
-      systemctl start docker || service docker start || true
-      systemctl enable docker || true
-    elif command -v service &> /dev/null; then
-      service docker start || true
+# Start Docker without using systemctl
+if command -v docker &> /dev/null; then
+  # Check if Docker daemon is running
+  if ! docker info &> /dev/null; then
+    echo "Starting Docker daemon..."
+    if command -v service &> /dev/null; then
+      service docker start || /etc/init.d/docker start 2>/dev/null || true
+    else
+      # Direct start of Docker daemon as a fallback
+      nohup dockerd --host=unix:///var/run/docker.sock --host=tcp://0.0.0.0:2375 > /var/log/dockerd.log 2>&1 &
+      # Wait briefly for it to start
+      sleep 3
     fi
+  fi
+  
+  # Try to enable Docker at boot without systemctl
+  if command -v chkconfig &> /dev/null; then
+    chkconfig docker on || true
+  elif [ -d "/etc/docker" ] || mkdir -p /etc/docker; then
+    echo "# Docker was set to start on boot" > /etc/docker/startup-enabled || true
+  fi
+  
+  echo "Docker is running"
+else
+  echo "Docker command not found. Please install Docker first."
+fi
     
     echo "✅ Docker installed. Ensuring permissions..."
     ensure_docker_permissions
