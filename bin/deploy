@@ -16,6 +16,40 @@ IMAGE_NAME="framework"
 IMAGE_TAG="latest"
 CONTAINER_NAME="framework-scheduler"
 
+# Function to start Docker daemon inside the container
+start_docker_daemon() {
+  echo "🚀 Starting Docker daemon inside the container..."
+  
+  # Install full Docker Engine if only CLI is installed
+  if ! command -v dockerd &> /dev/null; then
+    echo "📦 Installing Docker Engine..."
+    apt-get update -qq
+    apt-get install -y -qq docker-ce docker-ce-cli containerd.io
+  fi
+  
+  # Create required directories
+  mkdir -p /var/run /var/log
+  
+  # Start Docker daemon in the background
+  dockerd > /var/log/dockerd.log 2>&1 &
+  
+  # Wait for Docker daemon to become available
+  echo -n "⏳ Waiting for Docker daemon to start"
+  for i in {1..30}; do
+    if docker info &> /dev/null; then
+      echo " ✅"
+      echo "✅ Docker daemon is now running"
+      return 0
+    fi
+    echo -n "."
+    sleep 1
+  done
+  
+  echo " ❌"
+  echo "❌ Failed to start Docker daemon. Check logs at /var/log/dockerd.log"
+  return 1
+}
+
 # Check if Docker is installed, if not install it
 if ! command -v docker &> /dev/null; then
     echo "🔍 Docker not found. Installing Docker CLI..."
@@ -38,18 +72,57 @@ if ! command -v docker &> /dev/null; then
     apt-get install -y -qq docker-ce-cli
     
     echo "✅ Docker CLI installed successfully"
+fi
+
+# Check if Docker daemon is running or needs to be started
+if ! docker info &> /dev/null; then
+    echo "🔍 Cannot connect to Docker daemon"
     
     # Check if we're running inside a container
     if [ -f /.dockerenv ]; then
         echo "🐳 Detected Docker-in-Docker environment"
         
         # Check if Docker socket exists from host mount
-        if [ ! -S /var/run/docker.sock ]; then
-            echo "⚠️ Docker socket not found. Please run the container with '-v /var/run/docker.sock:/var/run/docker.sock'"
-            echo "⚠️ Attempting to continue, but build may fail..."
+        if [ -S /var/run/docker.sock ]; then
+            echo "🔍 Docker socket exists but cannot connect"
+            echo "⚠️ Attempting to fix socket permissions..."
+            
+            # Try to fix permissions on Docker socket
+            chmod 666 /var/run/docker.sock 2>/dev/null
+            
+            # Check if that fixed the issue
+            if ! docker info &> /dev/null; then
+                echo "❌ Still cannot connect to Docker daemon"
+                echo "⚠️ The socket might be mounted but not accessible."
+                
+                # Ask user if they want to start Docker daemon inside the container
+                echo "🔄 Starting Docker daemon inside the container (true DinD)..."
+                start_docker_daemon
+            else
+                echo "✅ Successfully connected to Docker daemon via socket"
+            fi
         else
-            # Fix permissions on Docker socket if needed
-            chmod 666 /var/run/docker.sock 2>/dev/null || true
+            echo "❌ Docker socket not found at /var/run/docker.sock"
+            echo "⚠️ Starting Docker daemon inside the container..."
+            start_docker_daemon
+            
+            # Recommend the proper way to mount socket for future runs
+            echo "ℹ️ For better performance, consider mounting the host's Docker socket:"
+            echo "ℹ️ docker run -v /var/run/docker.sock:/var/run/docker.sock ..."
+        fi
+    else
+        echo "🔍 Not in a container, but Docker daemon is not running"
+        echo "🔄 Attempting to start Docker service..."
+        
+        # Try different methods to start Docker
+        service docker start 2>/dev/null || /etc/init.d/docker start 2>/dev/null || start_docker_daemon
+        
+        # Check if that worked
+        if ! docker info &> /dev/null; then
+            echo "❌ Failed to start Docker daemon"
+            exit 1
+        else
+            echo "✅ Docker daemon started successfully"
         fi
     fi
 fi
