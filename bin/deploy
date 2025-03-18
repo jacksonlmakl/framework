@@ -20,8 +20,10 @@ fi
 
 # Create Dockerfile with Ubuntu base that supports cron
 echo "📝 Creating Dockerfile with scheduling support..."
+
+
 cat > Dockerfile << 'EOL'
-FROM ubuntu:22.04
+FROM docker.io/jrei/systemd-ubuntu:22.04
 
 USER root
 
