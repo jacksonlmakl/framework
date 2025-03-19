@@ -26,13 +26,13 @@ for ((i=0; i<$STEP_COUNT; i++)); do
     
     # Check if table, execute, and database exist
     if yq -e ".steps[$i].table" "$CONFIG_FILE" > /dev/null 2>&1; then
-        TABLE_PATH=$(yq -r ".steps[$i].table" "$CONFIG_FILE")
-        TABLE_PART="TABLE=model/${TABLE_PATH}"
+        TABLE_PATH="model/$(yq -r ".steps[$i].table" "$CONFIG_FILE")"
+        TABLE_PART="TABLE=${TABLE_PATH}"
     fi
     
     if yq -e ".steps[$i].execute" "$CONFIG_FILE" > /dev/null 2>&1; then
-        EXECUTE_PATH=$(yq -r ".steps[$i].execute" "$CONFIG_FILE")
-        EXECUTE_PART="EXECUTE=model/${EXECUTE_PATH}"
+        EXECUTE_PATH="model/$(yq -r ".steps[$i].execute" "$CONFIG_FILE")"
+        EXECUTE_PART="EXECUTE=${EXECUTE_PATH}"
     fi
     
     if yq -e ".steps[$i].database" "$CONFIG_FILE" > /dev/null 2>&1; then
