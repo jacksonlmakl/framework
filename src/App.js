@@ -17,6 +17,141 @@ const App = () => {
   const [logs, setLogs] = useState('');
   const [showLogs, setShowLogs] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isGitConnected, setIsGitConnected] = useState(false);
+
+// Add this function to check Git status
+const checkGitStatus = async () => {
+  try {
+    const response = await fetch('/git-status');
+    const data = await response.json();
+    setIsGitConnected(data.isRepo);
+  } catch (error) {
+    console.error('Error checking git status:', error);
+  }
+};
+
+// Add these functions for Git operations
+const pullChanges = async () => {
+  try {
+    setIsLoading(true);
+    setLogs('Pulling changes from Git repository...\n');
+    setShowLogs(true);
+    
+    const response = await fetch('/git-pull', {
+      method: 'POST',
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to pull changes');
+    }
+    
+    const result = await response.json();
+    setLogs(`Pulling changes from Git repository...\n\n${JSON.stringify(result, null, 2)}`);
+    
+    // Reload configuration after pull
+    await loadConfig();
+    
+    alert('Changes pulled successfully');
+  } catch (error) {
+    console.error('Error pulling changes:', error);
+    setLogs(`Error pulling changes: ${error.message}`);
+    alert(`Error pulling changes: ${error.message}`);
+  } finally {
+    setIsLoading(false);
+  }
+};
+
+const pushChanges = async () => {
+  try {
+    setIsLoading(true);
+    setLogs('Pushing changes to Git repository...\n');
+    setShowLogs(true);
+    
+    // First save the current configuration
+    await saveConfig();
+    
+    const response = await fetch('/git-push', {
+      method: 'POST',
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to push changes');
+    }
+    
+    const result = await response.json();
+    setLogs(`Pushing changes to Git repository...\n\n${JSON.stringify(result, null, 2)}`);
+    
+    alert('Changes pushed successfully');
+  } catch (error) {
+    console.error('Error pushing changes:', error);
+    setLogs(`Error pushing changes: ${error.message}`);
+    alert(`Error pushing changes: ${error.message}`);
+  } finally {
+    setIsLoading(false);
+  }
+};
+
+// Modified Actions panel with Git buttons
+<div className="bg-white shadow rounded-lg p-6">
+  <h2 className="text-xl font-semibold mb-6">Actions</h2>
+  
+  <div className="space-y-4">
+    <button 
+      onClick={deployFlow}
+      disabled={isLoading}
+      className="w-full bg-green-400 text-white px-4 py-3 rounded hover:bg-green-600 flex items-center justify-center disabled:opacity-50"
+    >
+      <Upload size={18} className="mr-2" />
+      Start
+    </button>
+    
+    <button 
+      onClick={stopFlow}
+      disabled={isLoading}
+      className="w-full bg-red-500 text-white px-4 py-3 rounded hover:bg-red-600 flex items-center justify-center disabled:opacity-50"
+    >
+      <X size={18} className="mr-2" />
+      Stop
+    </button>
+    
+    <button 
+      onClick={viewLogs}
+      disabled={isLoading}
+      className="w-full bg-gray-700 text-white px-4 py-3 rounded hover:bg-gray-800 flex items-center justify-center disabled:opacity-50"
+    >
+      <Terminal size={18} className="mr-2" />
+      Logs
+    </button>
+    
+    {/* Git Actions - only show if Git is connected */}
+    {isGitConnected && (
+      <div className="border-t pt-4 mt-4">
+        <h3 className="font-medium mb-3">Git Actions</h3>
+        <div className="flex space-x-2">
+          <button 
+            onClick={pullChanges}
+            disabled={isLoading}
+            className="flex-1 bg-blue-500 text-white px-4 py-3 rounded hover:bg-blue-600 flex items-center justify-center disabled:opacity-50"
+          >
+            <ArrowDown size={18} className="mr-2" />
+            Pull
+          </button>
+          
+          <button 
+            onClick={pushChanges}
+            disabled={isLoading}
+            className="flex-1 bg-green-500 text-white px-4 py-3 rounded hover:bg-green-600 flex items-center justify-center disabled:opacity-50"
+          >
+            <ArrowUp size={18} className="mr-2" />
+            Push
+          </button>
+        </div>
+      </div>
+    )}
+  </div>
+</div>
 
 const LoadingOverlay = () => {
   return isLoading ? (
@@ -65,7 +200,9 @@ const LogsModal = () => {
   useEffect(() => {
     loadConfig();
   }, []);
-
+useEffect(() => {
+  checkGitStatus();
+}, []);
   // Modify loadConfig function to better handle errors and missing files
   const loadConfig = async () => {
     try {
@@ -727,109 +864,290 @@ error_behavior: "null"
     );
   };
 
-  const SettingsModal = () => {
-    const [settings, setSettings] = useState({...globalConfig});
-    
-    const handleChange = (e) => {
-      const { name, value } = e.target;
-      if (name.startsWith('s3.')) {
-        const s3Field = name.split('.')[1];
-        setSettings({
-          ...settings,
-          s3: {
-            ...settings.s3,
-            [s3Field]: value
-          }
-        });
-      } else {
-        setSettings({
-          ...settings,
-          [name]: value
-        });
+ const SettingsModal = () => {
+  const [settings, setSettings] = useState({...globalConfig});
+  const [gitSettings, setGitSettings] = useState({
+    enabled: false,
+    repoUrl: '',
+    username: '',
+    token: '',
+    connected: false
+  });
+  const [isGitLoading, setIsGitLoading] = useState(false);
+  
+  // Check git status on component mount
+  useEffect(() => {
+    checkGitStatus();
+  }, []);
+  
+  const checkGitStatus = async () => {
+    try {
+      const response = await fetch('/git-status');
+      const data = await response.json();
+      
+      setGitSettings(prevState => ({
+        ...prevState,
+        connected: data.isRepo,
+        enabled: data.isRepo
+      }));
+    } catch (error) {
+      console.error('Error checking git status:', error);
+    }
+  };
+  
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    if (name.startsWith('s3.')) {
+      const s3Field = name.split('.')[1];
+      setSettings({
+        ...settings,
+        s3: {
+          ...settings.s3,
+          [s3Field]: value
+        }
+      });
+    } else {
+      setSettings({
+        ...settings,
+        [name]: value
+      });
+    }
+  };
+  
+  const handleGitChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setGitSettings({
+      ...gitSettings,
+      [name]: type === 'checkbox' ? checked : value
+    });
+  };
+  
+  const initGitRepo = async () => {
+    try {
+      setIsGitLoading(true);
+      
+      const response = await fetch('/git-init', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          repoUrl: gitSettings.repoUrl,
+          username: gitSettings.username,
+          token: gitSettings.token
+        }),
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to initialize git repository');
       }
-    };
-    
-    const handleSave = () => {
-      setGlobalConfig(settings);
-      setShowSettingsModal(false);
-    };
-    
-    return (
-      <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 overflow-y-auto p-4">
-        <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto relative">
-          <div className="flex justify-between items-center mb-4 sticky top-0 bg-white z-10">
-            <h2 className="text-xl font-semibold">Global Settings</h2>
-            <button onClick={() => setShowSettingsModal(false)} className="text-gray-500 hover:text-gray-700">
-              <X size={20} />
-            </button>
+      
+      await checkGitStatus();
+      alert('Git repository connected successfully');
+    } catch (error) {
+      console.error('Error initializing git:', error);
+      alert(`Error connecting to git: ${error.message}`);
+    } finally {
+      setIsGitLoading(false);
+    }
+  };
+  
+  const disconnectGit = async () => {
+    try {
+      setIsGitLoading(true);
+      
+      const response = await fetch('/git-disconnect', {
+        method: 'POST',
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to disconnect git repository');
+      }
+      
+      setGitSettings({
+        enabled: false,
+        repoUrl: '',
+        username: '',
+        token: '',
+        connected: false
+      });
+      
+      alert('Git repository disconnected successfully');
+    } catch (error) {
+      console.error('Error disconnecting git:', error);
+      alert(`Error disconnecting git: ${error.message}`);
+    } finally {
+      setIsGitLoading(false);
+    }
+  };
+  
+  const handleSave = () => {
+    setGlobalConfig(settings);
+    setShowSettingsModal(false);
+  };
+  
+  return (
+    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 overflow-y-auto p-4">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto relative">
+        <div className="flex justify-between items-center mb-4 sticky top-0 bg-white z-10">
+          <h2 className="text-xl font-semibold">Global Settings</h2>
+          <button onClick={() => setShowSettingsModal(false)} className="text-gray-500 hover:text-gray-700">
+            <X size={20} />
+          </button>
+        </div>
+        
+        {/* Form content */}
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Schedule</label>
+            <input 
+              type="text" 
+              name="schedule" 
+              value={settings.schedule} 
+              onChange={handleChange}
+              className="w-full p-2 border border-gray-300 rounded" 
+            />
+            <p className="text-xs text-gray-500 mt-1">Format: "* * * * *" (minute hour day month weekday)</p>
           </div>
           
-          {/* Form content */}
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Schedule</label>
-              <input 
-                type="text" 
-                name="schedule" 
-                value={settings.schedule} 
-                onChange={handleChange}
-                className="w-full p-2 border border-gray-300 rounded" 
-              />
-              <p className="text-xs text-gray-500 mt-1">Format: "* * * * *" (minute hour day month weekday)</p>
-            </div>
+          <div className="border-t pt-4">
+            <h3 className="font-medium mb-2">S3 Connection Parameters</h3>
             
-            <div className="border-t pt-4">
-              <h3 className="font-medium mb-2">S3 Connection Parameters</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Bucket Name</label>
+                <input 
+                  type="text" 
+                  name="s3.name" 
+                  value={settings.s3.name} 
+                  onChange={handleChange}
+                  className="w-full p-2 border border-gray-300 rounded" 
+                />
+              </div>
               
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Bucket Name</label>
-                  <input 
-                    type="text" 
-                    name="s3.name" 
-                    value={settings.s3.name} 
-                    onChange={handleChange}
-                    className="w-full p-2 border border-gray-300 rounded" 
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Access Key</label>
-                  <input 
-                    type="password" 
-                    name="s3.access_key" 
-                    value={settings.s3.access_key} 
-                    onChange={handleChange}
-                    className="w-full p-2 border border-gray-300 rounded" 
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Secret Key</label>
-                  <input 
-                    type="password" 
-                    name="s3.secret_key" 
-                    value={settings.s3.secret_key} 
-                    onChange={handleChange}
-                    className="w-full p-2 border border-gray-300 rounded" 
-                  />
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Access Key</label>
+                <input 
+                  type="password" 
+                  name="s3.access_key" 
+                  value={settings.s3.access_key} 
+                  onChange={handleChange}
+                  className="w-full p-2 border border-gray-300 rounded" 
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Secret Key</label>
+                <input 
+                  type="password" 
+                  name="s3.secret_key" 
+                  value={settings.s3.secret_key} 
+                  onChange={handleChange}
+                  className="w-full p-2 border border-gray-300 rounded" 
+                />
               </div>
             </div>
           </div>
           
-          <div className="mt-6 flex justify-end sticky bottom-0 bg-white z-10 pt-2">
-            <button 
-              onClick={handleSave}
-              className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-            >
-              Save Settings
-            </button>
+          {/* GitHub Integration */}
+          <div className="border-t pt-4">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-medium">GitHub Integration</h3>
+              <div className="flex items-center">
+                <input 
+                  type="checkbox" 
+                  name="enabled" 
+                  id="gitEnabled"
+                  checked={gitSettings.enabled} 
+                  onChange={handleGitChange}
+                  className="mr-2" 
+                  disabled={gitSettings.connected}
+                />
+                <label htmlFor="gitEnabled" className="text-sm">Enable</label>
+              </div>
+            </div>
+            
+            {gitSettings.enabled && !gitSettings.connected && (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Repository URL</label>
+                  <input 
+                    type="text" 
+                    name="repoUrl" 
+                    value={gitSettings.repoUrl} 
+                    onChange={handleGitChange}
+                    placeholder="https://github.com/user/repo.git"
+                    className="w-full p-2 border border-gray-300 rounded" 
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Only the model/ folder and controller.yaml will be tracked</p>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">GitHub Username</label>
+                  <input 
+                    type="text" 
+                    name="username" 
+                    value={gitSettings.username} 
+                    onChange={handleGitChange}
+                    className="w-full p-2 border border-gray-300 rounded" 
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Personal Access Token</label>
+                  <input 
+                    type="password" 
+                    name="token" 
+                    value={gitSettings.token} 
+                    onChange={handleGitChange}
+                    className="w-full p-2 border border-gray-300 rounded" 
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Token requires repo scope permissions</p>
+                </div>
+                
+                <button 
+                  onClick={initGitRepo}
+                  disabled={isGitLoading || !gitSettings.repoUrl || !gitSettings.username || !gitSettings.token}
+                  className="w-full bg-blue-500 text-white px-3 py-2 rounded hover:bg-blue-600 disabled:opacity-50 mt-2"
+                >
+                  {isGitLoading ? 'Connecting...' : 'Connect Repository'}
+                </button>
+              </div>
+            )}
+            
+            {gitSettings.connected && (
+              <div>
+                <p className="text-sm text-green-600 mb-3">
+                  <span className="inline-block w-3 h-3 rounded-full bg-green-500 mr-2"></span>
+                  Connected to GitHub repository
+                </p>
+                
+                <button 
+                  onClick={disconnectGit}
+                  disabled={isGitLoading}
+                  className="w-full border border-red-500 text-red-500 px-3 py-2 rounded hover:bg-red-50 disabled:opacity-50"
+                >
+                  {isGitLoading ? 'Disconnecting...' : 'Disconnect Repository'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
+        
+        <div className="mt-6 flex justify-end sticky bottom-0 bg-white z-10 pt-2">
+          <button 
+            onClick={handleSave}
+            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+          >
+            Save Settings
+          </button>
+        </div>
       </div>
-    );
-  };
+    </div>
+  );
+};
   
   return (
     <div className="min-h-screen bg-gray-50">
