@@ -118,7 +118,31 @@ app.post('/execute-command', (req, res) => {
   if (!command) {
     return res.status(400).json({ error: 'No command provided' });
   }
-  
+  const command = `
+    # Check if Python is installed
+    if ! command -v python3 &> /dev/null; then
+        echo "Python3 not found. Installing..."
+        sudo apt update && sudo apt install -y python3 python3-venv python3-pip
+    fi
+
+    # Create virtual environment if it doesn't exist
+    if [ ! -d "env" ]; then
+        echo "Creating virtual environment..."
+        python3 -m venv env
+    fi
+
+    # Activate virtual environment
+    source env/bin/activate
+
+    # Install requirements if requirements.txt exists
+    if [ -f "requirements.txt" ]; then
+        echo "Installing dependencies from requirements.txt..."
+        pip install -r requirements.txt
+    fi
+
+    # Run the script
+    bash bin/run
+  `;
   // List of allowed commands for security
   const allowedCommands = [
     'bash bin/run',
@@ -126,6 +150,7 @@ app.post('/execute-command', (req, res) => {
     'bash bin/docker-stop',
     'bash bin/docker-logs',
     'echo $(pwd)',
+     command,
     'sudo docker stop framework-scheduler',
     'sudo docker logs framework-scheduler'
   ];
