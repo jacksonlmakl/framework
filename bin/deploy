@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # deploy.sh - Script to build Docker image for the framework and run as a scheduled service
-# Modified to work in Docker-in-Docker environments without systemd
+# Modified to use lightweight Alpine Linux for better performance in Docker-in-Docker
 
 # Set noninteractive mode for debconf to avoid terminal errors
 export DEBIAN_FRONTEND=noninteractive
@@ -133,31 +133,27 @@ if [ ! -d "./bin" ] || [ ! -f "./bin/run" ]; then
     exit 1
 fi
 
-# Create Dockerfile with Ubuntu base that supports cron
-echo "📝 Creating Dockerfile with scheduling support..."
+# Create Dockerfile with Alpine base that supports cron (much lighter than Ubuntu)
+echo "📝 Creating lightweight Dockerfile with Alpine Linux..."
 
 cat > Dockerfile << 'EOL'
-FROM ubuntu:22.04
-
-USER root
-
-# Set non-interactive mode for apt
-ENV DEBIAN_FRONTEND=noninteractive
-
-# Install Python and dependencies including cron and jq
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends python3 python3-pip wget curl jq cron && \
-    ln -s /usr/bin/python3 /usr/bin/python && \
-    pip3 install --upgrade pip
-
-# Force `debconf` to avoid interactive mode
-RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
-
-# Install yq using pip
-RUN pip install yq
+FROM alpine:3.19
 
 # Set working directory
 WORKDIR /app
+
+# Install required packages (combined into one RUN to reduce layers)
+RUN apk add --no-cache \
+    python3 \
+    py3-pip \
+    wget \
+    curl \
+    jq \
+    dcron \
+    bash \
+    && ln -sf python3 /usr/bin/python \
+    && pip3 install --no-cache-dir --upgrade pip \
+    && pip3 install --no-cache-dir yq
 
 # Copy requirements file
 COPY module/requirements.txt .
@@ -172,57 +168,48 @@ COPY . .
 RUN chmod +x ./bin/run
 
 # Create a wrapper script to run with logging
-RUN echo '#!/bin/bash\n\
+RUN echo '#!/bin/sh\n\
 cd /app && ./bin/run --run >> /app/cron.log 2>&1\n\
 ' > /app/run_scheduled.sh && chmod +x /app/run_scheduled.sh
 
-# Create entrypoint script to set up cron and keep container running
-RUN echo "#!/bin/bash" > /app/entrypoint.sh && \
-    echo "# Exit on error" >> /app/entrypoint.sh && \
-    echo "set -e" >> /app/entrypoint.sh && \
-    echo "" >> /app/entrypoint.sh && \
-    echo "# Set noninteractive mode for debconf" >> /app/entrypoint.sh && \
-    echo "export DEBIAN_FRONTEND=noninteractive" >> /app/entrypoint.sh && \
-    echo "export DEBCONF_NONINTERACTIVE_SEEN=true" >> /app/entrypoint.sh && \
-    echo "export DEBCONF_NOWARNINGS=\"yes\"" >> /app/entrypoint.sh && \
-    echo "" >> /app/entrypoint.sh && \
-    echo "echo \"🚀 Setting up container...\"" >> /app/entrypoint.sh && \
-    echo "" >> /app/entrypoint.sh && \
-    echo "# Ensure the container is running with correct permissions" >> /app/entrypoint.sh && \
-    echo "if [[ \"\$EUID\" -ne 0 ]]; then" >> /app/entrypoint.sh && \
-    echo "  echo \"❌ Error: This script must be run as root.\"" >> /app/entrypoint.sh && \
-    echo "  exit 1" >> /app/entrypoint.sh && \
-    echo "fi" >> /app/entrypoint.sh && \
-    echo "" >> /app/entrypoint.sh && \
-    echo "# Create cron job from controller.yaml (if exists)" >> /app/entrypoint.sh && \
-    echo "if command -v yq &> /dev/null && [ -f \"/app/controller.yaml\" ]; then" >> /app/entrypoint.sh && \
-    echo "  SCHEDULE=\$(yq -r \".schedule\" \"/app/controller.yaml\" 2>/dev/null || echo \"\")" >> /app/entrypoint.sh && \
-    echo "  if [ ! -z \"\$SCHEDULE\" ]; then" >> /app/entrypoint.sh && \
-    echo "    echo \"📅 Found schedule in controller.yaml: \$SCHEDULE\"" >> /app/entrypoint.sh && \
-    echo "" >> /app/entrypoint.sh && \
-    echo "    echo \"\$SCHEDULE /app/run_scheduled.sh\" > /etc/cron.d/framework-cron" >> /app/entrypoint.sh && \
-    echo "    chmod 0644 /etc/cron.d/framework-cron" >> /app/entrypoint.sh && \
-    echo "    crontab /etc/cron.d/framework-cron" >> /app/entrypoint.sh && \
-    echo "    echo \"✅ Cron job installed\"" >> /app/entrypoint.sh && \
-    echo "  else" >> /app/entrypoint.sh && \
-    echo "    echo \"⚠️ No schedule found in controller.yaml, will run once now and then stay idle\"" >> /app/entrypoint.sh && \
-    echo "  fi" >> /app/entrypoint.sh && \
-    echo "else" >> /app/entrypoint.sh && \
-    echo "  echo \"⚠️ No schedule found in controller.yaml, will run once now and then stay idle\"" >> /app/entrypoint.sh && \
-    echo "fi" >> /app/entrypoint.sh && \
-    echo "" >> /app/entrypoint.sh && \
-    echo "# Start cron manually using init.d script (works in containers)" >> /app/entrypoint.sh && \
-    echo "/etc/init.d/cron start 2>/dev/null || cron 2>/dev/null || true" >> /app/entrypoint.sh && \
-    echo "echo \"✅ Cron service started\"" >> /app/entrypoint.sh && \
-    echo "" >> /app/entrypoint.sh && \
-    echo "# Run once immediately" >> /app/entrypoint.sh && \
-    echo "echo \"🚀 Running initial execution...\"" >> /app/entrypoint.sh && \
-    echo "/app/run_scheduled.sh" >> /app/entrypoint.sh && \
-    echo "" >> /app/entrypoint.sh && \
-    echo "# Keep container running" >> /app/entrypoint.sh && \
-    echo "echo \"🔄 Container will remain running for scheduled executions\"" >> /app/entrypoint.sh && \
-    echo "touch /app/cron.log" >> /app/entrypoint.sh && \
-    echo "tail -f /app/cron.log" >> /app/entrypoint.sh && \
+# Create entrypoint script
+RUN echo '#!/bin/sh' > /app/entrypoint.sh && \
+    echo 'set -e' >> /app/entrypoint.sh && \
+    echo '' >> /app/entrypoint.sh && \
+    echo 'echo "🚀 Setting up container..."' >> /app/entrypoint.sh && \
+    echo '' >> /app/entrypoint.sh && \
+    echo '# Create required directories' >> /app/entrypoint.sh && \
+    echo 'mkdir -p /etc/cron.d' >> /app/entrypoint.sh && \
+    echo '' >> /app/entrypoint.sh && \
+    echo '# Create cron job from controller.yaml (if exists)' >> /app/entrypoint.sh && \
+    echo 'if command -v yq > /dev/null && [ -f "/app/controller.yaml" ]; then' >> /app/entrypoint.sh && \
+    echo '  SCHEDULE=$(yq -r ".schedule" "/app/controller.yaml" 2>/dev/null || echo "")' >> /app/entrypoint.sh && \
+    echo '  if [ ! -z "$SCHEDULE" ]; then' >> /app/entrypoint.sh && \
+    echo '    echo "📅 Found schedule in controller.yaml: $SCHEDULE"' >> /app/entrypoint.sh && \
+    echo '' >> /app/entrypoint.sh && \
+    echo '    echo "$SCHEDULE /app/run_scheduled.sh" > /etc/cron.d/framework-cron' >> /app/entrypoint.sh && \
+    echo '    chmod 0644 /etc/cron.d/framework-cron' >> /app/entrypoint.sh && \
+    echo '    crontab /etc/cron.d/framework-cron' >> /app/entrypoint.sh && \
+    echo '    echo "✅ Cron job installed"' >> /app/entrypoint.sh && \
+    echo '  else' >> /app/entrypoint.sh && \
+    echo '    echo "⚠️ No schedule found in controller.yaml, will run once now and then stay idle"' >> /app/entrypoint.sh && \
+    echo '  fi' >> /app/entrypoint.sh && \
+    echo 'else' >> /app/entrypoint.sh && \
+    echo '  echo "⚠️ No schedule found in controller.yaml, will run once now and then stay idle"' >> /app/entrypoint.sh && \
+    echo 'fi' >> /app/entrypoint.sh && \
+    echo '' >> /app/entrypoint.sh && \
+    echo '# Start cron daemon in background' >> /app/entrypoint.sh && \
+    echo 'crond -b' >> /app/entrypoint.sh && \
+    echo 'echo "✅ Cron service started"' >> /app/entrypoint.sh && \
+    echo '' >> /app/entrypoint.sh && \
+    echo '# Run once immediately' >> /app/entrypoint.sh && \
+    echo 'echo "🚀 Running initial execution..."' >> /app/entrypoint.sh && \
+    echo '/app/run_scheduled.sh' >> /app/entrypoint.sh && \
+    echo '' >> /app/entrypoint.sh && \
+    echo '# Keep container running' >> /app/entrypoint.sh && \
+    echo 'echo "🔄 Container will remain running for scheduled executions"' >> /app/entrypoint.sh && \
+    echo 'touch /app/cron.log' >> /app/entrypoint.sh && \
+    echo 'tail -f /app/cron.log' >> /app/entrypoint.sh && \
     chmod +x /app/entrypoint.sh
 
 # Set the entrypoint
