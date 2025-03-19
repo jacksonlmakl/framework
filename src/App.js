@@ -92,7 +92,9 @@ const pushChanges = async () => {
     setIsLoading(false);
   }
 };
-
+const deployFlow = () => {
+  executeTerminalCommand('bash bin/deploy', 'Flow deployed successfully');
+};
 // Modified Actions panel with Git buttons
 <div className="bg-white shadow rounded-lg p-6">
   <h2 className="text-xl font-semibold mb-6">Actions</h2>
@@ -444,9 +446,7 @@ useEffect(() => {
     executeTerminalCommand('bash bin/run', 'Flow started successfully');
   };
 
-  const deployFlow = () => {
-    executeTerminalCommand('bash bin/deploy', 'Flow deployed successfully');
-  };
+
 
   const stopFlow = () => {
     executeTerminalCommand('bash bin/docker-stop', 'Flow stopped successfully');
