@@ -223,9 +223,11 @@ const LogsModal = () => {
   const loadFileContent = async (filePath) => {
     try {
       if (!filePath) return '';
-      
+      if (filePath === 'controller.yaml''){
+      const response = await fetch(`/file-content?path=${encodeURIComponent(filePath)}`);
+      }else{
       const response = await fetch(`/file-content?path=${encodeURIComponent('model/'+filePath)}`);
-      
+      };
       if (response.status === 404) {
         console.log(`File not found: ${filePath}, will create when saved`);
         return '';
