@@ -224,7 +224,7 @@ const LogsModal = () => {
     try {
       if (!filePath) return '';
       
-      const response = await fetch(`/file-content?path=${encodeURIComponent(filePath)}`);
+      const response = await fetch(`/file-content?path=${encodeURIComponent('model/'+filePath)}`);
       
       if (response.status === 404) {
         console.log(`File not found: ${filePath}, will create when saved`);
@@ -251,7 +251,7 @@ const LogsModal = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ path: filePath, content }),
+        body: JSON.stringify({ path: 'model/'+filePath, content }),
       });
       
       if (!response.ok) {
