@@ -898,10 +898,10 @@ error_behavior: "null"
               <button 
                 onClick={deployFlow}
                 disabled={isLoading}
-                className="w-full bg-blue-500 text-white px-4 py-3 rounded hover:bg-blue-600 flex items-center justify-center disabled:opacity-50"
+                className="w-full bg-green-400 text-white px-4 py-3 rounded hover:bg-green-600 flex items-center justify-center disabled:opacity-50"
               >
                 <Upload size={18} className="mr-2" />
-                Deploy
+                Start
               </button>
               
               <button 
