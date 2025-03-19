@@ -220,45 +220,38 @@ const LogsModal = () => {
   };
 
   // New function to load file content
-const loadFileContent = async (filePath) => {
-  try {
-    if (!filePath) return '';
-
-    const fullPath = filePath === 'controller.yaml' 
-      ? filePath 
-      : `model/${filePath}`;
-
-    const response = await fetch(`/file-content?path=${encodeURIComponent(fullPath)}`);
-
-    if (response.status === 404) {
-      console.log(`File not found: ${filePath}, will create when saved`);
+  const loadFileContent = async (filePath) => {
+    try {
+      if (!filePath) return '';
+      
+      const response = await fetch(`/file-content?path=${encodeURIComponent(filePath)}`);
+      
+      if (response.status === 404) {
+        console.log(`File not found: ${filePath}, will create when saved`);
+        return '';
+      }
+      
+      if (!response.ok) {
+        throw new Error(`Failed to load file: ${response.status} ${response.statusText}`);
+      }
+      
+      const content = await response.text();
+      return content;
+    } catch (error) {
+      console.error(`Error loading file ${filePath}:`, error);
       return '';
     }
-
-    if (!response.ok) {
-      throw new Error(`Failed to load file: ${response.status} ${response.statusText}`);
-    }
-
-    return await response.text(); // Assuming file content is text-based
-  } catch (error) {
-    console.error(error.message);
-    return '';
-  }
-};
-
+  };
 
   // New function to save file content
   const saveFileContent = async (filePath, content) => {
     try {
-      const fullPath = filePath === 'controller.yaml' 
-      ? filePath 
-      : `model/${filePath}`;
       const response = await fetch('/save-file', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ path: 'model/'+fullPath, content }),
+        body: JSON.stringify({ path: filePath, content }),
       });
       
       if (!response.ok) {
@@ -402,13 +395,13 @@ const loadFileContent = async (filePath) => {
         
         // Load the execute file content
         if (formData.execute && formData.execute !== 's3') {
-          const content = await loadFileContent(formData.execute);
+          const content = await loadFileContent('model/'+formData.execute);
           setFileContent(content);
         }
         
         // Load the table YAML content if it exists
         if (formData.table) {
-          const content = await loadFileContent(formData.table);
+          const content = await loadFileContent('model/'+formData.table);
           
           if (content) {
             setTableContent(content);
@@ -527,12 +520,12 @@ error_behavior: "null"
         
         // Save the execute file if not S3
         if (formData.execute && formData.execute !== 's3' && fileContent !== '') {
-          await saveFileContent(formData.execute, fileContent);
+          await saveFileContent('model/'+formData.execute, fileContent);
         }
         
         // Save the table YAML file if it exists
         if (formData.table && tableContent !== '') {
-          await saveFileContent(formData.table, tableContent);
+          await saveFileContent('model/'+formData.table, tableContent);
         }
         
         // Update the step in the main state
@@ -947,4 +940,3 @@ error_behavior: "null"
 };
 
 export default App;
-
