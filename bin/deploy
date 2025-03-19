@@ -174,6 +174,7 @@ if docker build -t $IMAGE_NAME:$IMAGE_TAG . > /dev/null; then
         -v $(pwd)/controller.yaml:/app/controller.yaml \
         -v $(pwd)/model:/app/model \
         -v $(pwd)/data:/app/data \
+        -v /var/run/docker.sock:/var/run/docker.sock
         $IMAGE_NAME:$IMAGE_TAG > /dev/null
     
     echo ""
