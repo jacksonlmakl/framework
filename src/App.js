@@ -304,8 +304,35 @@ const LogsModal = () => {
   };
 
   const runFlow = () => {
-    executeTerminalCommand('bash bin/run', 'Flow started successfully');
+    const command = `
+      # Check if Python is installed
+      if ! command -v python3 &> /dev/null; then
+          echo "Python3 not found. Installing..."
+          sudo apt update && sudo apt install -y python3 python3-venv python3-pip
+      fi
+  
+      # Create virtual environment if it doesn't exist
+      if [ ! -d "env" ]; then
+          echo "Creating virtual environment..."
+          python3 -m venv env
+      fi
+  
+      # Activate virtual environment
+      source env/bin/activate
+  
+      # Install requirements if requirements.txt exists
+      if [ -f "requirements.txt" ]; then
+          echo "Installing dependencies from requirements.txt..."
+          pip install -r requirements.txt
+      fi
+  
+      # Run the script
+      bash bin/run
+    `;
+  
+    executeTerminalCommand(command, 'Flow started successfully');
   };
+
 
   const deployFlow = () => {
     executeTerminalCommand('bash bin/deploy', 'Flow deployed successfully');
