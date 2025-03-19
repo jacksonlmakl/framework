@@ -1,12 +1,8 @@
 #!/bin/bash
+# Fast deploy.sh - Optimized for Docker-in-Docker performance
 
-# deploy.sh - Script to build Docker image for the framework and run as a scheduled service
-# Modified to use lightweight Alpine Linux for better performance in Docker-in-Docker
-
-# Set noninteractive mode for debconf to avoid terminal errors
+# Set noninteractive mode for debconf
 export DEBIAN_FRONTEND=noninteractive
-export DEBCONF_NONINTERACTIVE_SEEN=true
-export DEBCONF_NOWARNINGS="yes"
 
 # Exit on error
 set -e
@@ -16,116 +12,22 @@ IMAGE_NAME="framework"
 IMAGE_TAG="latest"
 CONTAINER_NAME="framework-scheduler"
 
-# Function to start Docker daemon inside the container
-start_docker_daemon() {
-  echo "🚀 Starting Docker daemon inside the container..."
-  
-  # Install full Docker Engine if only CLI is installed
-  if ! command -v dockerd &> /dev/null; then
-    echo "📦 Installing Docker Engine..."
-    apt-get update -qq
-    apt-get install -y -qq docker-ce docker-ce-cli containerd.io
+# Function to check if we need Docker
+need_docker() {
+  # If Docker socket is already mounted and working, we don't need to install Docker
+  if [ -S /var/run/docker.sock ] && docker info &>/dev/null; then
+    echo "✅ Host Docker socket is mounted and accessible"
+    return 1  # We DON'T need to install Docker
   fi
   
-  # Create required directories
-  mkdir -p /var/run /var/log
+  # If Docker is already installed and functional, we don't need to install it
+  if command -v docker &>/dev/null && docker info &>/dev/null; then
+    echo "✅ Docker is already installed and working"
+    return 1  # We DON'T need to install Docker
+  fi
   
-  # Start Docker daemon in the background
-  dockerd > /var/log/dockerd.log 2>&1 &
-  
-  # Wait for Docker daemon to become available
-  echo -n "⏳ Waiting for Docker daemon to start"
-  for i in {1..30}; do
-    if docker info &> /dev/null; then
-      echo " ✅"
-      echo "✅ Docker daemon is now running"
-      return 0
-    fi
-    echo -n "."
-    sleep 1
-  done
-  
-  echo " ❌"
-  echo "❌ Failed to start Docker daemon. Check logs at /var/log/dockerd.log"
-  return 1
+  return 0  # We DO need to install Docker
 }
-
-# Check if Docker is installed, if not install it
-if ! command -v docker &> /dev/null; then
-    echo "🔍 Docker not found. Installing Docker CLI..."
-    
-    # Update package lists
-    apt-get update -qq
-    
-    # Install prerequisites
-    apt-get install -y -qq apt-transport-https ca-certificates curl gnupg lsb-release
-    
-    # Add Docker's official GPG key
-    mkdir -p /etc/apt/keyrings
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-    
-    # Set up the Docker repository
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
-    
-    # Install Docker CLI only (not the full engine)
-    apt-get update -qq
-    apt-get install -y -qq docker-ce-cli
-    
-    echo "✅ Docker CLI installed successfully"
-fi
-
-# Check if Docker daemon is running or needs to be started
-if ! docker info &> /dev/null; then
-    echo "🔍 Cannot connect to Docker daemon"
-    
-    # Check if we're running inside a container
-    if [ -f /.dockerenv ]; then
-        echo "🐳 Detected Docker-in-Docker environment"
-        
-        # Check if Docker socket exists from host mount
-        if [ -S /var/run/docker.sock ]; then
-            echo "🔍 Docker socket exists but cannot connect"
-            echo "⚠️ Attempting to fix socket permissions..."
-            
-            # Try to fix permissions on Docker socket
-            chmod 666 /var/run/docker.sock 2>/dev/null
-            
-            # Check if that fixed the issue
-            if ! docker info &> /dev/null; then
-                echo "❌ Still cannot connect to Docker daemon"
-                echo "⚠️ The socket might be mounted but not accessible."
-                
-                # Ask user if they want to start Docker daemon inside the container
-                echo "🔄 Starting Docker daemon inside the container (true DinD)..."
-                start_docker_daemon
-            else
-                echo "✅ Successfully connected to Docker daemon via socket"
-            fi
-        else
-            echo "❌ Docker socket not found at /var/run/docker.sock"
-            echo "⚠️ Starting Docker daemon inside the container..."
-            start_docker_daemon
-            
-            # Recommend the proper way to mount socket for future runs
-            echo "ℹ️ For better performance, consider mounting the host's Docker socket:"
-            echo "ℹ️ docker run -v /var/run/docker.sock:/var/run/docker.sock ..."
-        fi
-    else
-        echo "🔍 Not in a container, but Docker daemon is not running"
-        echo "🔄 Attempting to start Docker service..."
-        
-        # Try different methods to start Docker
-        service docker start 2>/dev/null || /etc/init.d/docker start 2>/dev/null || start_docker_daemon
-        
-        # Check if that worked
-        if ! docker info &> /dev/null; then
-            echo "❌ Failed to start Docker daemon"
-            exit 1
-        else
-            echo "✅ Docker daemon started successfully"
-        fi
-    fi
-fi
 
 # Check if we're in the repository root directory
 if [ ! -d "./bin" ] || [ ! -f "./bin/run" ]; then
@@ -133,7 +35,40 @@ if [ ! -d "./bin" ] || [ ! -f "./bin/run" ]; then
     exit 1
 fi
 
-# Create Dockerfile with Alpine base that supports cron (much lighter than Ubuntu)
+# Quick path for mounted Docker socket
+if [ -S /var/run/docker.sock ]; then
+    echo "🔍 Found mounted Docker socket, trying to use it..."
+    chmod 666 /var/run/docker.sock &>/dev/null || true
+    
+    if docker info &>/dev/null; then
+        echo "✅ Host Docker socket is working correctly"
+    else
+        echo "⚠️ Host Docker socket exists but can't connect to Docker daemon"
+        echo "⚠️ This usually indicates a permission issue"
+        
+        # Try a quick fix for socket permissions
+        chmod 666 /var/run/docker.sock &>/dev/null || true
+        
+        if ! docker info &>/dev/null && need_docker; then
+            echo "🔍 Need to install Docker..."
+            
+            # Install Docker CLI only for quick path
+            if ! command -v docker &>/dev/null; then
+                echo "📦 Installing Docker CLI (fast path)..."
+                apt-get update -qq >/dev/null
+                apt-get install -y -qq apt-transport-https ca-certificates curl gnupg >/dev/null
+                mkdir -p /etc/apt/keyrings 2>/dev/null || true
+                curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg 2>/dev/null
+                echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | tee /etc/apt/sources.list.d/docker.list >/dev/null
+                apt-get update -qq >/dev/null
+                apt-get install -y -qq docker-ce-cli >/dev/null
+                echo "✅ Docker CLI installed"
+            fi
+        fi
+    fi
+fi
+
+# Create Dockerfile with Alpine base (much lighter than Ubuntu)
 echo "📝 Creating lightweight Dockerfile with Alpine Linux..."
 
 cat > Dockerfile << 'EOL'
@@ -216,16 +151,19 @@ RUN echo '#!/bin/sh' > /app/entrypoint.sh && \
 ENTRYPOINT ["/app/entrypoint.sh"]
 EOL
 
-# Build the Docker image
+# Use buildkit for faster builds
+export DOCKER_BUILDKIT=1
+
+# Build the Docker image - with minimal output
 echo "🔨 Building Docker image: $IMAGE_NAME:$IMAGE_TAG"
-if docker build -t $IMAGE_NAME:$IMAGE_TAG .; then
+if docker build -t $IMAGE_NAME:$IMAGE_TAG . > /dev/null; then
     echo "✅ Docker image built successfully!"
     
-    # Stop and remove existing container if it exists
-    if docker ps -a | grep -q $CONTAINER_NAME; then
+    # Stop and remove existing container if it exists - quiet mode
+    if docker ps -a -q --filter "name=$CONTAINER_NAME" | grep -q .; then
         echo "🔄 Stopping and removing existing container..."
-        docker stop $CONTAINER_NAME || true
-        docker rm $CONTAINER_NAME || true
+        docker stop $CONTAINER_NAME > /dev/null 2>&1 || true
+        docker rm $CONTAINER_NAME > /dev/null 2>&1 || true
     fi
     
     # Run the container with restart policy and volume mounts
@@ -236,7 +174,7 @@ if docker build -t $IMAGE_NAME:$IMAGE_TAG .; then
         -v $(pwd)/controller.yaml:/app/controller.yaml \
         -v $(pwd)/model:/app/model \
         -v $(pwd)/data:/app/data \
-        $IMAGE_NAME:$IMAGE_TAG
+        $IMAGE_NAME:$IMAGE_TAG > /dev/null
     
     echo ""
     echo "✅ Container is now running in the background with auto-restart"
