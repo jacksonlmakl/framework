@@ -894,7 +894,18 @@ error_behavior: "null"
             <h2 className="text-xl font-semibold mb-6">Actions</h2>
             
             <div className="space-y-4">
-              
+
+                
+              <button 
+                onClick={runFlow}
+                disabled={isLoading}
+                className="w-full bg-orange-400 text-white px-4 py-3 rounded hover:bg-green-600 flex items-center justify-center disabled:opacity-50"
+              >
+                <Play size={18} className="mr-2" />
+                Test
+              </button>
+
+                  
               <button 
                 onClick={deployFlow}
                 disabled={isLoading}
