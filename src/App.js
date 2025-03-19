@@ -220,40 +220,45 @@ const LogsModal = () => {
   };
 
   // New function to load file content
-  const loadFileContent = async (filePath) => {
-    try {
-      if (!filePath) return '';
-      if (filePath === 'controller.yaml'){
-      const response = await fetch(`/file-content?path=${encodeURIComponent(filePath)}`);
-      }else{
-      const response = await fetch(`/file-content?path=${encodeURIComponent('model/'+filePath)}`);
-      };
-      if (response.status === 404) {
-        console.log(`File not found: ${filePath}, will create when saved`);
-        return '';
-      }
-      
-      if (!response.ok) {
-        throw new Error(`Failed to load file: ${response.status} ${response.statusText}`);
-      }
-      
-      const content = await response.text();
-      return content;
-    } catch (error) {
-      console.error(`Error loading file ${filePath}:`, error);
+const loadFileContent = async (filePath) => {
+  try {
+    if (!filePath) return '';
+
+    const fullPath = filePath === 'controller.yaml' 
+      ? filePath 
+      : `model/${filePath}`;
+
+    const response = await fetch(`/file-content?path=${encodeURIComponent(fullPath)}`);
+
+    if (response.status === 404) {
+      console.log(`File not found: ${filePath}, will create when saved`);
       return '';
     }
-  };
+
+    if (!response.ok) {
+      throw new Error(`Failed to load file: ${response.status} ${response.statusText}`);
+    }
+
+    return await response.text(); // Assuming file content is text-based
+  } catch (error) {
+    console.error(error.message);
+    return '';
+  }
+};
+
 
   // New function to save file content
   const saveFileContent = async (filePath, content) => {
     try {
+      const fullPath = filePath === 'controller.yaml' 
+      ? filePath 
+      : `model/${filePath}`;
       const response = await fetch('/save-file', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ path: 'model/'+filePath, content }),
+        body: JSON.stringify({ path: 'model/'+fullPath, content }),
       });
       
       if (!response.ok) {
