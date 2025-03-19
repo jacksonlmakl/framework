@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Settings, Play, Upload, AlertCircle, Terminal, X, Save, Edit2, Code } from 'lucide-react';
+import { Plus, Trash2, Settings, Play, Upload, AlertCircle, ArrowDown, ArrowUp, Terminal, X, Save, Edit2, Code } from 'lucide-react';
 import yaml from 'js-yaml'; // Import js-yaml for parsing YAML files
 
 const App = () => {
