@@ -158,6 +158,113 @@ app.post('/execute-command', (req, res) => {
   });
 });
 
+
+// Add these routes to server.js
+
+// Route to check git status
+app.get('/git-status', async (req, res) => {
+  try {
+    const git = simpleGit();
+    const status = await git.status();
+    res.json({ 
+      isRepo: status.isValid || false,
+      status: status 
+    });
+  } catch (error) {
+    console.error('Error checking git status:', error);
+    res.status(500).json({ error: 'Failed to check git status' });
+  }
+});
+
+// Route to initialize git for specific folders
+app.post('/git-init', async (req, res) => {
+  try {
+    const { repoUrl, username, token } = req.body;
+    
+    if (!repoUrl || !username || !token) {
+      return res.status(400).json({ error: 'Missing repository details' });
+    }
+    
+    // Remove existing .git if it exists
+    if (fs.existsSync('./.git')) {
+      fs.rmSync('./.git', { recursive: true, force: true });
+    }
+    
+    // Create a new git repo
+    const git = simpleGit();
+    await git.init();
+    
+    // Create .gitignore to exclude everything except model/ and controller.yaml
+    const gitignoreContent = `# Ignore everything
+*
+*/
+
+# Except the model folder and controller.yaml
+!model/
+!model/**
+!controller.yaml
+`;
+    fs.writeFileSync('.gitignore', gitignoreContent);
+    
+    // Setup remote with authentication
+    const remoteUrl = `https://${username}:${token}@${repoUrl.replace('https://', '')}`;
+    await git.addRemote('origin', remoteUrl);
+    
+    res.json({ success: true, message: 'Git repository initialized' });
+  } catch (error) {
+    console.error('Error initializing git:', error);
+    res.status(500).json({ error: 'Failed to initialize git repository' });
+  }
+});
+
+// Route to pull changes
+app.post('/git-pull', async (req, res) => {
+  try {
+    const git = simpleGit();
+    const pullResult = await git.pull('origin', 'main');
+    res.json({ success: true, result: pullResult });
+  } catch (error) {
+    console.error('Error pulling changes:', error);
+    res.status(500).json({ error: 'Failed to pull changes' });
+  }
+});
+
+// Route to push changes
+app.post('/git-push', async (req, res) => {
+  try {
+    const git = simpleGit();
+    
+    // Add only model/ and controller.yaml
+    await git.add(['model/', 'controller.yaml']);
+    
+    // Commit changes
+    await git.commit('Update workflow configuration');
+    
+    // Push to remote
+    const pushResult = await git.push('origin', 'main');
+    
+    res.json({ success: true, result: pushResult });
+  } catch (error) {
+    console.error('Error pushing changes:', error);
+    res.status(500).json({ error: 'Failed to push changes' });
+  }
+});
+
+// Route to disconnect from git
+app.post('/git-disconnect', async (req, res) => {
+  try {
+    if (fs.existsSync('./.git')) {
+      fs.rmSync('./.git', { recursive: true, force: true });
+    }
+    res.json({ success: true, message: 'Git disconnected' });
+  } catch (error) {
+    console.error('Error disconnecting git:', error);
+    res.status(500).json({ error: 'Failed to disconnect git' });
+  }
+});
+
+
+
 // Start the server
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
