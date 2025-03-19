@@ -6,19 +6,19 @@ s3:
  
 steps:
   - name: "Replicate"
-    execute: "model/replicate.py"
+    execute: "replicate.py"
     
   - name: "Insert"
-    table: "model/table.yaml"
-    execute: "model/data.json"
+    table: "table.yaml"
+    execute: "data.json"
   
   - name: "Transform"
-    table: "model/table.yaml"
-    execute: "model/table.sql"
+    table: "table.yaml"
+    execute: "table.sql"
     
   - name: "Execute SQL"
     database: "demo"
-    execute: "model/test.sql"
+    execute: "test.sql"
     
   - name: "S3"
     execute: "s3"
