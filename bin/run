@@ -31,7 +31,15 @@ for ((i=0; i<$STEP_COUNT; i++)); do
     fi
     
     if yq -e ".steps[$i].execute" "$CONFIG_FILE" > /dev/null 2>&1; then
-        EXECUTE_PATH="model/$(yq -r ".steps[$i].execute" "$CONFIG_FILE")"
+        # Extract the execute value first
+        EXECUTE_VALUE=$(yq -r ".steps[$i].execute" "$CONFIG_FILE")
+        
+        # Conditionally prepend "model/" if the value is not "s3"
+        if [ "$EXECUTE_VALUE" = "s3" ]; then
+          EXECUTE_PATH="$EXECUTE_VALUE"
+        else
+          EXECUTE_PATH="model/$EXECUTE_VALUE"
+        fi
         EXECUTE_PART="EXECUTE=${EXECUTE_PATH}"
     fi
     
