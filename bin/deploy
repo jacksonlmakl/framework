@@ -1,14 +1,12 @@
 #!/bin/bash
 
-# deploy.sh - Script to build Docker image for the framework and run as a scheduled service
-# Modified to work in Docker-in-Docker environments without systemd
+# deploy.sh - Optimized script to build Docker image and run as a scheduled service
+# Works in Docker-in-Docker environments without systemd
 
-# Set noninteractive mode for debconf to avoid terminal errors
+# Set noninteractive mode and exit on error
 export DEBIAN_FRONTEND=noninteractive
 export DEBCONF_NONINTERACTIVE_SEEN=true
 export DEBCONF_NOWARNINGS="yes"
-
-# Exit on error
 set -e
 
 # Set variables
@@ -16,29 +14,36 @@ IMAGE_NAME="framework"
 IMAGE_TAG="latest"
 CONTAINER_NAME="framework-scheduler"
 
+# Function to check docker and install if needed
+setup_docker() {
+  # Check if Docker is installed, if not install CLI
+  if ! command -v docker &> /dev/null; then
+    echo "🔍 Docker not found. Installing Docker CLI..."
+    apt-get update -qq && apt-get install -y -qq apt-transport-https ca-certificates curl gnupg lsb-release
+    mkdir -p /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+    apt-get update -qq && apt-get install -y -qq docker-ce-cli
+    echo "✅ Docker CLI installed"
+  fi
+}
+
 # Function to start Docker daemon inside the container
 start_docker_daemon() {
-  echo "🚀 Starting Docker daemon inside the container..."
+  echo "🚀 Starting Docker daemon..."
   
-  # Install full Docker Engine if only CLI is installed
+  # Install Docker Engine if only CLI is installed
   if ! command -v dockerd &> /dev/null; then
-    echo "📦 Installing Docker Engine..."
-    apt-get update -qq
-    apt-get install -y -qq docker-ce docker-ce-cli containerd.io
+    apt-get update -qq && apt-get install -y -qq docker-ce docker-ce-cli containerd.io
   fi
   
-  # Create required directories
   mkdir -p /var/run /var/log
-  
-  # Start Docker daemon in the background
   dockerd > /var/log/dockerd.log 2>&1 &
   
-  # Wait for Docker daemon to become available
-  echo -n "⏳ Waiting for Docker daemon to start"
+  echo -n "⏳ Waiting for Docker daemon"
   for i in {1..30}; do
     if docker info &> /dev/null; then
       echo " ✅"
-      echo "✅ Docker daemon is now running"
       return 0
     fi
     echo -n "."
@@ -46,190 +51,129 @@ start_docker_daemon() {
   done
   
   echo " ❌"
-  echo "❌ Failed to start Docker daemon. Check logs at /var/log/dockerd.log"
-  return 1
+  echo "❌ Failed to start Docker daemon. See logs at /var/log/dockerd.log"
+  exit 1
 }
 
-# Check if Docker is installed, if not install it
-if ! command -v docker &> /dev/null; then
-    echo "🔍 Docker not found. Installing Docker CLI..."
-    
-    # Update package lists
-    apt-get update -qq
-    
-    # Install prerequisites
-    apt-get install -y -qq apt-transport-https ca-certificates curl gnupg lsb-release
-    
-    # Add Docker's official GPG key
-    mkdir -p /etc/apt/keyrings
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-    
-    # Set up the Docker repository
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
-    
-    # Install Docker CLI only (not the full engine)
-    apt-get update -qq
-    apt-get install -y -qq docker-ce-cli
-    
-    echo "✅ Docker CLI installed successfully"
-fi
-
-# Check if Docker daemon is running or needs to be started
-if ! docker info &> /dev/null; then
+# Function to ensure Docker is running
+ensure_docker_running() {
+  if ! docker info &> /dev/null; then
     echo "🔍 Cannot connect to Docker daemon"
     
     # Check if we're running inside a container
     if [ -f /.dockerenv ]; then
-        echo "🐳 Detected Docker-in-Docker environment"
+      echo "🐳 Detected Docker-in-Docker environment"
+      
+      # Check if Docker socket exists
+      if [ -S /var/run/docker.sock ]; then
+        chmod 666 /var/run/docker.sock 2>/dev/null
         
-        # Check if Docker socket exists from host mount
-        if [ -S /var/run/docker.sock ]; then
-            echo "🔍 Docker socket exists but cannot connect"
-            echo "⚠️ Attempting to fix socket permissions..."
-            
-            # Try to fix permissions on Docker socket
-            chmod 666 /var/run/docker.sock 2>/dev/null
-            
-            # Check if that fixed the issue
-            if ! docker info &> /dev/null; then
-                echo "❌ Still cannot connect to Docker daemon"
-                echo "⚠️ The socket might be mounted but not accessible."
-                
-                # Ask user if they want to start Docker daemon inside the container
-                echo "🔄 Starting Docker daemon inside the container (true DinD)..."
-                start_docker_daemon
-            else
-                echo "✅ Successfully connected to Docker daemon via socket"
-            fi
-        else
-            echo "❌ Docker socket not found at /var/run/docker.sock"
-            echo "⚠️ Starting Docker daemon inside the container..."
-            start_docker_daemon
-            
-            # Recommend the proper way to mount socket for future runs
-            echo "ℹ️ For better performance, consider mounting the host's Docker socket:"
-            echo "ℹ️ docker run -v /var/run/docker.sock:/var/run/docker.sock ..."
-        fi
-    else
-        echo "🔍 Not in a container, but Docker daemon is not running"
-        echo "🔄 Attempting to start Docker service..."
-        
-        # Try different methods to start Docker
-        service docker start 2>/dev/null || /etc/init.d/docker start 2>/dev/null || start_docker_daemon
-        
-        # Check if that worked
+        # Check if that fixed the issue
         if ! docker info &> /dev/null; then
-            echo "❌ Failed to start Docker daemon"
-            exit 1
+          start_docker_daemon
         else
-            echo "✅ Docker daemon started successfully"
+          echo "✅ Connected to Docker daemon via socket"
         fi
+      else
+        start_docker_daemon
+      fi
+    else
+      # Not in a container, start Docker service
+      service docker start 2>/dev/null || /etc/init.d/docker start 2>/dev/null || start_docker_daemon
+      
+      if ! docker info &> /dev/null; then
+        echo "❌ Failed to start Docker daemon"
+        exit 1
+      fi
     fi
-fi
+  fi
+}
 
-# Check if we're in the repository root directory
+# Check repository structure
 if [ ! -d "./bin" ] || [ ! -f "./bin/run" ]; then
-    echo "❌ Error: This script should be run from the repository root directory."
+    echo "❌ Error: Run this script from the repository root directory."
     exit 1
 fi
 
-# Create Dockerfile with Ubuntu base that supports cron
-echo "📝 Creating Dockerfile with scheduling support..."
+# Setup Docker environment
+setup_docker
+ensure_docker_running
 
+# Create Dockerfile
+echo "📝 Creating Dockerfile with scheduling support..."
 cat > Dockerfile << 'EOL'
 FROM ubuntu:22.04
 
 USER root
-
-# Set non-interactive mode for apt
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install Python and dependencies including cron and jq
+# Install dependencies - combine RUN commands to reduce layers
 RUN apt-get update && \
     apt-get install -y --no-install-recommends python3 python3-pip wget curl jq cron && \
     ln -s /usr/bin/python3 /usr/bin/python && \
-    pip3 install --upgrade pip
+    pip3 install --upgrade pip && \
+    pip install yq && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* && \
+    echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
 
-# Force `debconf` to avoid interactive mode
-RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
-
-# Install yq using pip
-RUN pip install yq
-
-# Set working directory
 WORKDIR /app
 
-# Copy requirements file
+# Copy and install requirements first (better caching)
 COPY module/requirements.txt .
-
-# Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the entire repository
+# Copy repository and prepare scripts
 COPY . .
+RUN chmod +x ./bin/run && \
+    echo '#!/bin/bash\ncd /app && ./bin/run --run >> /app/cron.log 2>&1' > /app/run_scheduled.sh && \
+    chmod +x /app/run_scheduled.sh
 
-# Make run script executable
-RUN chmod +x ./bin/run
+# Create entrypoint script
+RUN echo '#!/bin/bash
+set -e
 
-# Create a wrapper script to run with logging
-RUN echo '#!/bin/bash\n\
-cd /app && ./bin/run --run >> /app/cron.log 2>&1\n\
-' > /app/run_scheduled.sh && chmod +x /app/run_scheduled.sh
+# Set noninteractive mode
+export DEBIAN_FRONTEND=noninteractive
+export DEBCONF_NONINTERACTIVE_SEEN=true
+export DEBCONF_NOWARNINGS="yes"
 
-# Create entrypoint script to set up cron and keep container running
-RUN echo "#!/bin/bash" > /app/entrypoint.sh && \
-    echo "# Exit on error" >> /app/entrypoint.sh && \
-    echo "set -e" >> /app/entrypoint.sh && \
-    echo "" >> /app/entrypoint.sh && \
-    echo "# Set noninteractive mode for debconf" >> /app/entrypoint.sh && \
-    echo "export DEBIAN_FRONTEND=noninteractive" >> /app/entrypoint.sh && \
-    echo "export DEBCONF_NONINTERACTIVE_SEEN=true" >> /app/entrypoint.sh && \
-    echo "export DEBCONF_NOWARNINGS=\"yes\"" >> /app/entrypoint.sh && \
-    echo "" >> /app/entrypoint.sh && \
-    echo "echo \"🚀 Setting up container...\"" >> /app/entrypoint.sh && \
-    echo "" >> /app/entrypoint.sh && \
-    echo "# Ensure the container is running with correct permissions" >> /app/entrypoint.sh && \
-    echo "if [[ \"\$EUID\" -ne 0 ]]; then" >> /app/entrypoint.sh && \
-    echo "  echo \"❌ Error: This script must be run as root.\"" >> /app/entrypoint.sh && \
-    echo "  exit 1" >> /app/entrypoint.sh && \
-    echo "fi" >> /app/entrypoint.sh && \
-    echo "" >> /app/entrypoint.sh && \
-    echo "# Create cron job from controller.yaml (if exists)" >> /app/entrypoint.sh && \
-    echo "if command -v yq &> /dev/null && [ -f \"/app/controller.yaml\" ]; then" >> /app/entrypoint.sh && \
-    echo "  SCHEDULE=\$(yq -r \".schedule\" \"/app/controller.yaml\" 2>/dev/null || echo \"\")" >> /app/entrypoint.sh && \
-    echo "  if [ ! -z \"\$SCHEDULE\" ]; then" >> /app/entrypoint.sh && \
-    echo "    echo \"📅 Found schedule in controller.yaml: \$SCHEDULE\"" >> /app/entrypoint.sh && \
-    echo "" >> /app/entrypoint.sh && \
-    echo "    echo \"\$SCHEDULE /app/run_scheduled.sh\" > /etc/cron.d/framework-cron" >> /app/entrypoint.sh && \
-    echo "    chmod 0644 /etc/cron.d/framework-cron" >> /app/entrypoint.sh && \
-    echo "    crontab /etc/cron.d/framework-cron" >> /app/entrypoint.sh && \
-    echo "    echo \"✅ Cron job installed\"" >> /app/entrypoint.sh && \
-    echo "  else" >> /app/entrypoint.sh && \
-    echo "    echo \"⚠️ No schedule found in controller.yaml, will run once now and then stay idle\"" >> /app/entrypoint.sh && \
-    echo "  fi" >> /app/entrypoint.sh && \
-    echo "else" >> /app/entrypoint.sh && \
-    echo "  echo \"⚠️ No schedule found in controller.yaml, will run once now and then stay idle\"" >> /app/entrypoint.sh && \
-    echo "fi" >> /app/entrypoint.sh && \
-    echo "" >> /app/entrypoint.sh && \
-    echo "# Start cron manually using init.d script (works in containers)" >> /app/entrypoint.sh && \
-    echo "/etc/init.d/cron start 2>/dev/null || cron 2>/dev/null || true" >> /app/entrypoint.sh && \
-    echo "echo \"✅ Cron service started\"" >> /app/entrypoint.sh && \
-    echo "" >> /app/entrypoint.sh && \
-    echo "# Run once immediately" >> /app/entrypoint.sh && \
-    echo "echo \"🚀 Running initial execution...\"" >> /app/entrypoint.sh && \
-    echo "/app/run_scheduled.sh" >> /app/entrypoint.sh && \
-    echo "" >> /app/entrypoint.sh && \
-    echo "# Keep container running" >> /app/entrypoint.sh && \
-    echo "echo \"🔄 Container will remain running for scheduled executions\"" >> /app/entrypoint.sh && \
-    echo "touch /app/cron.log" >> /app/entrypoint.sh && \
-    echo "tail -f /app/cron.log" >> /app/entrypoint.sh && \
-    chmod +x /app/entrypoint.sh
+echo "🚀 Setting up container..."
 
-# Set the entrypoint
+# Create cron job from controller.yaml
+if command -v yq &> /dev/null && [ -f "/app/controller.yaml" ]; then
+  SCHEDULE=$(yq -r ".schedule" "/app/controller.yaml" 2>/dev/null || echo "")
+  if [ ! -z "$SCHEDULE" ]; then
+    echo "📅 Found schedule in controller.yaml: $SCHEDULE"
+    echo "$SCHEDULE /app/run_scheduled.sh" > /etc/cron.d/framework-cron
+    chmod 0644 /etc/cron.d/framework-cron
+    crontab /etc/cron.d/framework-cron
+    echo "✅ Cron job installed"
+  else
+    echo "⚠️ No schedule found in controller.yaml"
+  fi
+else
+  echo "⚠️ No schedule configuration found"
+fi
+
+# Start cron service
+/etc/init.d/cron start 2>/dev/null || cron 2>/dev/null || true
+echo "✅ Cron service started"
+
+# Run once immediately
+echo "🚀 Running initial execution..."
+/app/run_scheduled.sh
+
+# Keep container running
+echo "🔄 Container running for scheduled executions"
+touch /app/cron.log
+tail -f /app/cron.log
+' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
+
 ENTRYPOINT ["/app/entrypoint.sh"]
 EOL
 
-# Build the Docker image
+# Build and run the container
 echo "🔨 Building Docker image: $IMAGE_NAME:$IMAGE_TAG"
 if docker build -t $IMAGE_NAME:$IMAGE_TAG .; then
     echo "✅ Docker image built successfully!"
@@ -237,11 +181,11 @@ if docker build -t $IMAGE_NAME:$IMAGE_TAG .; then
     # Stop and remove existing container if it exists
     if docker ps -a | grep -q $CONTAINER_NAME; then
         echo "🔄 Stopping and removing existing container..."
-        docker stop $CONTAINER_NAME || true
-        docker rm $CONTAINER_NAME || true
+        docker stop $CONTAINER_NAME > /dev/null 2>&1 || true
+        docker rm $CONTAINER_NAME > /dev/null 2>&1 || true
     fi
     
-    # Run the container with restart policy and volume mounts
+    # Run the container with volume mounts
     echo "🚀 Starting container with auto-restart..."
     docker run -d \
         --name $CONTAINER_NAME \
@@ -252,10 +196,276 @@ if docker build -t $IMAGE_NAME:$IMAGE_TAG .; then
         $IMAGE_NAME:$IMAGE_TAG
     
     echo ""
-    echo "✅ Container is now running in the background with auto-restart"
-    echo "📋 Container logs can be viewed with: docker logs $CONTAINER_NAME"
-    echo "📊 To stop the container: docker stop $CONTAINER_NAME"
+    echo "✅ Container running in background with auto-restart"
+    echo "📋 View logs with: docker logs $CONTAINER_NAME"
+    echo "📊 Stop container with: docker stop $CONTAINER_NAME"
 else
     echo "❌ Docker image build failed."
     exit 1
 fi
+
+
+
+
+
+# #!/bin/bash
+
+# # deploy.sh - Script to build Docker image for the framework and run as a scheduled service
+# # Modified to work in Docker-in-Docker environments without systemd
+
+# # Set noninteractive mode for debconf to avoid terminal errors
+# export DEBIAN_FRONTEND=noninteractive
+# export DEBCONF_NONINTERACTIVE_SEEN=true
+# export DEBCONF_NOWARNINGS="yes"
+
+# # Exit on error
+# set -e
+
+# # Set variables
+# IMAGE_NAME="framework"
+# IMAGE_TAG="latest"
+# CONTAINER_NAME="framework-scheduler"
+
+# # Function to start Docker daemon inside the container
+# start_docker_daemon() {
+#   echo "🚀 Starting Docker daemon inside the container..."
+  
+#   # Install full Docker Engine if only CLI is installed
+#   if ! command -v dockerd &> /dev/null; then
+#     echo "📦 Installing Docker Engine..."
+#     apt-get update -qq
+#     apt-get install -y -qq docker-ce docker-ce-cli containerd.io
+#   fi
+  
+#   # Create required directories
+#   mkdir -p /var/run /var/log
+  
+#   # Start Docker daemon in the background
+#   dockerd > /var/log/dockerd.log 2>&1 &
+  
+#   # Wait for Docker daemon to become available
+#   echo -n "⏳ Waiting for Docker daemon to start"
+#   for i in {1..30}; do
+#     if docker info &> /dev/null; then
+#       echo " ✅"
+#       echo "✅ Docker daemon is now running"
+#       return 0
+#     fi
+#     echo -n "."
+#     sleep 1
+#   done
+  
+#   echo " ❌"
+#   echo "❌ Failed to start Docker daemon. Check logs at /var/log/dockerd.log"
+#   return 1
+# }
+
+# # Check if Docker is installed, if not install it
+# if ! command -v docker &> /dev/null; then
+#     echo "🔍 Docker not found. Installing Docker CLI..."
+    
+#     # Update package lists
+#     apt-get update -qq
+    
+#     # Install prerequisites
+#     apt-get install -y -qq apt-transport-https ca-certificates curl gnupg lsb-release
+    
+#     # Add Docker's official GPG key
+#     mkdir -p /etc/apt/keyrings
+#     curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    
+#     # Set up the Docker repository
+#     echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+    
+#     # Install Docker CLI only (not the full engine)
+#     apt-get update -qq
+#     apt-get install -y -qq docker-ce-cli
+    
+#     echo "✅ Docker CLI installed successfully"
+# fi
+
+# # Check if Docker daemon is running or needs to be started
+# if ! docker info &> /dev/null; then
+#     echo "🔍 Cannot connect to Docker daemon"
+    
+#     # Check if we're running inside a container
+#     if [ -f /.dockerenv ]; then
+#         echo "🐳 Detected Docker-in-Docker environment"
+        
+#         # Check if Docker socket exists from host mount
+#         if [ -S /var/run/docker.sock ]; then
+#             echo "🔍 Docker socket exists but cannot connect"
+#             echo "⚠️ Attempting to fix socket permissions..."
+            
+#             # Try to fix permissions on Docker socket
+#             chmod 666 /var/run/docker.sock 2>/dev/null
+            
+#             # Check if that fixed the issue
+#             if ! docker info &> /dev/null; then
+#                 echo "❌ Still cannot connect to Docker daemon"
+#                 echo "⚠️ The socket might be mounted but not accessible."
+                
+#                 # Ask user if they want to start Docker daemon inside the container
+#                 echo "🔄 Starting Docker daemon inside the container (true DinD)..."
+#                 start_docker_daemon
+#             else
+#                 echo "✅ Successfully connected to Docker daemon via socket"
+#             fi
+#         else
+#             echo "❌ Docker socket not found at /var/run/docker.sock"
+#             echo "⚠️ Starting Docker daemon inside the container..."
+#             start_docker_daemon
+            
+#             # Recommend the proper way to mount socket for future runs
+#             echo "ℹ️ For better performance, consider mounting the host's Docker socket:"
+#             echo "ℹ️ docker run -v /var/run/docker.sock:/var/run/docker.sock ..."
+#         fi
+#     else
+#         echo "🔍 Not in a container, but Docker daemon is not running"
+#         echo "🔄 Attempting to start Docker service..."
+        
+#         # Try different methods to start Docker
+#         service docker start 2>/dev/null || /etc/init.d/docker start 2>/dev/null || start_docker_daemon
+        
+#         # Check if that worked
+#         if ! docker info &> /dev/null; then
+#             echo "❌ Failed to start Docker daemon"
+#             exit 1
+#         else
+#             echo "✅ Docker daemon started successfully"
+#         fi
+#     fi
+# fi
+
+# # Check if we're in the repository root directory
+# if [ ! -d "./bin" ] || [ ! -f "./bin/run" ]; then
+#     echo "❌ Error: This script should be run from the repository root directory."
+#     exit 1
+# fi
+
+# # Create Dockerfile with Ubuntu base that supports cron
+# echo "📝 Creating Dockerfile with scheduling support..."
+
+# cat > Dockerfile << 'EOL'
+# FROM ubuntu:22.04
+
+# USER root
+
+# # Set non-interactive mode for apt
+# ENV DEBIAN_FRONTEND=noninteractive
+
+# # Install Python and dependencies including cron and jq
+# RUN apt-get update && \
+#     apt-get install -y --no-install-recommends python3 python3-pip wget curl jq cron && \
+#     ln -s /usr/bin/python3 /usr/bin/python && \
+#     pip3 install --upgrade pip
+
+# # Force `debconf` to avoid interactive mode
+# RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
+
+# # Install yq using pip
+# RUN pip install yq
+
+# # Set working directory
+# WORKDIR /app
+
+# # Copy requirements file
+# COPY module/requirements.txt .
+
+# # Install Python dependencies
+# RUN pip install --no-cache-dir -r requirements.txt
+
+# # Copy the entire repository
+# COPY . .
+
+# # Make run script executable
+# RUN chmod +x ./bin/run
+
+# # Create a wrapper script to run with logging
+# RUN echo '#!/bin/bash\n\
+# cd /app && ./bin/run --run >> /app/cron.log 2>&1\n\
+# ' > /app/run_scheduled.sh && chmod +x /app/run_scheduled.sh
+
+# # Create entrypoint script to set up cron and keep container running
+# RUN echo "#!/bin/bash" > /app/entrypoint.sh && \
+#     echo "# Exit on error" >> /app/entrypoint.sh && \
+#     echo "set -e" >> /app/entrypoint.sh && \
+#     echo "" >> /app/entrypoint.sh && \
+#     echo "# Set noninteractive mode for debconf" >> /app/entrypoint.sh && \
+#     echo "export DEBIAN_FRONTEND=noninteractive" >> /app/entrypoint.sh && \
+#     echo "export DEBCONF_NONINTERACTIVE_SEEN=true" >> /app/entrypoint.sh && \
+#     echo "export DEBCONF_NOWARNINGS=\"yes\"" >> /app/entrypoint.sh && \
+#     echo "" >> /app/entrypoint.sh && \
+#     echo "echo \"🚀 Setting up container...\"" >> /app/entrypoint.sh && \
+#     echo "" >> /app/entrypoint.sh && \
+#     echo "# Ensure the container is running with correct permissions" >> /app/entrypoint.sh && \
+#     echo "if [[ \"\$EUID\" -ne 0 ]]; then" >> /app/entrypoint.sh && \
+#     echo "  echo \"❌ Error: This script must be run as root.\"" >> /app/entrypoint.sh && \
+#     echo "  exit 1" >> /app/entrypoint.sh && \
+#     echo "fi" >> /app/entrypoint.sh && \
+#     echo "" >> /app/entrypoint.sh && \
+#     echo "# Create cron job from controller.yaml (if exists)" >> /app/entrypoint.sh && \
+#     echo "if command -v yq &> /dev/null && [ -f \"/app/controller.yaml\" ]; then" >> /app/entrypoint.sh && \
+#     echo "  SCHEDULE=\$(yq -r \".schedule\" \"/app/controller.yaml\" 2>/dev/null || echo \"\")" >> /app/entrypoint.sh && \
+#     echo "  if [ ! -z \"\$SCHEDULE\" ]; then" >> /app/entrypoint.sh && \
+#     echo "    echo \"📅 Found schedule in controller.yaml: \$SCHEDULE\"" >> /app/entrypoint.sh && \
+#     echo "" >> /app/entrypoint.sh && \
+#     echo "    echo \"\$SCHEDULE /app/run_scheduled.sh\" > /etc/cron.d/framework-cron" >> /app/entrypoint.sh && \
+#     echo "    chmod 0644 /etc/cron.d/framework-cron" >> /app/entrypoint.sh && \
+#     echo "    crontab /etc/cron.d/framework-cron" >> /app/entrypoint.sh && \
+#     echo "    echo \"✅ Cron job installed\"" >> /app/entrypoint.sh && \
+#     echo "  else" >> /app/entrypoint.sh && \
+#     echo "    echo \"⚠️ No schedule found in controller.yaml, will run once now and then stay idle\"" >> /app/entrypoint.sh && \
+#     echo "  fi" >> /app/entrypoint.sh && \
+#     echo "else" >> /app/entrypoint.sh && \
+#     echo "  echo \"⚠️ No schedule found in controller.yaml, will run once now and then stay idle\"" >> /app/entrypoint.sh && \
+#     echo "fi" >> /app/entrypoint.sh && \
+#     echo "" >> /app/entrypoint.sh && \
+#     echo "# Start cron manually using init.d script (works in containers)" >> /app/entrypoint.sh && \
+#     echo "/etc/init.d/cron start 2>/dev/null || cron 2>/dev/null || true" >> /app/entrypoint.sh && \
+#     echo "echo \"✅ Cron service started\"" >> /app/entrypoint.sh && \
+#     echo "" >> /app/entrypoint.sh && \
+#     echo "# Run once immediately" >> /app/entrypoint.sh && \
+#     echo "echo \"🚀 Running initial execution...\"" >> /app/entrypoint.sh && \
+#     echo "/app/run_scheduled.sh" >> /app/entrypoint.sh && \
+#     echo "" >> /app/entrypoint.sh && \
+#     echo "# Keep container running" >> /app/entrypoint.sh && \
+#     echo "echo \"🔄 Container will remain running for scheduled executions\"" >> /app/entrypoint.sh && \
+#     echo "touch /app/cron.log" >> /app/entrypoint.sh && \
+#     echo "tail -f /app/cron.log" >> /app/entrypoint.sh && \
+#     chmod +x /app/entrypoint.sh
+
+# # Set the entrypoint
+# ENTRYPOINT ["/app/entrypoint.sh"]
+# EOL
+
+# # Build the Docker image
+# echo "🔨 Building Docker image: $IMAGE_NAME:$IMAGE_TAG"
+# if docker build -t $IMAGE_NAME:$IMAGE_TAG .; then
+#     echo "✅ Docker image built successfully!"
+    
+#     # Stop and remove existing container if it exists
+#     if docker ps -a | grep -q $CONTAINER_NAME; then
+#         echo "🔄 Stopping and removing existing container..."
+#         docker stop $CONTAINER_NAME || true
+#         docker rm $CONTAINER_NAME || true
+#     fi
+    
+#     # Run the container with restart policy and volume mounts
+#     echo "🚀 Starting container with auto-restart..."
+#     docker run -d \
+#         --name $CONTAINER_NAME \
+#         --restart always \
+#         -v $(pwd)/controller.yaml:/app/controller.yaml \
+#         -v $(pwd)/model:/app/model \
+#         -v $(pwd)/data:/app/data \
+#         $IMAGE_NAME:$IMAGE_TAG
+    
+#     echo ""
+#     echo "✅ Container is now running in the background with auto-restart"
+#     echo "📋 Container logs can be viewed with: docker logs $CONTAINER_NAME"
+#     echo "📊 To stop the container: docker stop $CONTAINER_NAME"
+# else
+#     echo "❌ Docker image build failed."
+#     exit 1
+# fi
