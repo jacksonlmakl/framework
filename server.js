@@ -1,3 +1,7 @@
+// Add to the top of server.js
+const { execSync } = require('child_process');
+const simpleGit = require('simple-git');
+
 const express = require('express');
 const { exec } = require('child_process');
 const fs = require('fs');
