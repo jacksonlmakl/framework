@@ -118,7 +118,7 @@ app.post('/execute-command', (req, res) => {
   if (!command) {
     return res.status(400).json({ error: 'No command provided' });
   }
-  const command = `
+  const test_run_command = `
     # Check if Python is installed
     if ! command -v python3 &> /dev/null; then
         echo "Python3 not found. Installing..."
@@ -150,7 +150,7 @@ app.post('/execute-command', (req, res) => {
     'bash bin/docker-stop',
     'bash bin/docker-logs',
     'echo $(pwd)',
-     command,
+     test_run_command,
     'sudo docker stop framework-scheduler',
     'sudo docker logs framework-scheduler'
   ];
