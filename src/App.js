@@ -327,7 +327,7 @@ const LogsModal = () => {
       fi
   
       # Run the script
-      bash bin/run
+      sudo bash bin/run
     `;
   
     executeTerminalCommand(command, 'Flow started successfully');
