@@ -774,8 +774,8 @@ error_behavior: "null"
                     className="w-full p-2.5 rounded-lg bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   >
                     <option value="Python">Python</option>
-                    <option value="SQL Insert">SQL Insert</option>
-                    <option value="SQL Query">SQL Query</option>
+                    // <option value="SQL Insert">SQL Insert</option>
+                    // <option value="SQL Query">SQL Query</option>
                     <option value="SQL Script">SQL Script</option>
                     <option value="S3 Upload">S3 Upload</option>
                   </select>
