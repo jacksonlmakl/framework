@@ -204,25 +204,35 @@ RUN echo "#!/bin/bash" > /app/entrypoint.sh && \
     echo "    chmod 0644 /etc/cron.d/framework-cron" >> /app/entrypoint.sh && \
     echo "    crontab /etc/cron.d/framework-cron" >> /app/entrypoint.sh && \
     echo "    echo \"✅ Cron job installed\"" >> /app/entrypoint.sh && \
+    echo "" >> /app/entrypoint.sh && \
+    echo "    # Start cron manually using init.d script (works in containers)" >> /app/entrypoint.sh && \
+    echo "    /etc/init.d/cron start 2>/dev/null || cron 2>/dev/null || true" >> /app/entrypoint.sh && \
+    echo "    echo \"✅ Cron service started\"" >> /app/entrypoint.sh && \
+    echo "" >> /app/entrypoint.sh && \
+    echo "    # Run once immediately" >> /app/entrypoint.sh && \
+    echo "    echo \"🚀 Running initial execution...\"" >> /app/entrypoint.sh && \
+    echo "    /app/run_scheduled.sh" >> /app/entrypoint.sh && \
+    echo "" >> /app/entrypoint.sh && \
+    echo "    # Keep container running" >> /app/entrypoint.sh && \
+    echo "    echo \"🔄 Container will remain running for scheduled executions\"" >> /app/entrypoint.sh && \
+    echo "    touch /app/cron.log" >> /app/entrypoint.sh && \
+    echo "    tail -f /app/cron.log" >> /app/entrypoint.sh && \
     echo "  else" >> /app/entrypoint.sh && \
-    echo "    echo \"⚠️ No schedule found in controller.yaml, will run once now and then stay idle\"" >> /app/entrypoint.sh && \
+    echo "    echo \"⚠️ No schedule found in controller.yaml, container will remain idle\"" >> /app/entrypoint.sh && \
+    echo "    echo \"⏸️ No tasks will be executed\"" >> /app/entrypoint.sh && \
+    echo "    # Keep container running but idle" >> /app/entrypoint.sh && \
+    echo "    touch /app/idle.log" >> /app/entrypoint.sh && \
+    echo "    echo \"⏳ Container started in idle mode at \$(date)\" >> /app/idle.log" >> /app/entrypoint.sh && \
+    echo "    tail -f /app/idle.log" >> /app/entrypoint.sh && \
     echo "  fi" >> /app/entrypoint.sh && \
     echo "else" >> /app/entrypoint.sh && \
-    echo "  echo \"⚠️ No schedule found in controller.yaml, will run once now and then stay idle\"" >> /app/entrypoint.sh && \
+    echo "  echo \"⚠️ No schedule found in controller.yaml, container will remain idle\"" >> /app/entrypoint.sh && \
+    echo "  echo \"⏸️ No tasks will be executed\"" >> /app/entrypoint.sh && \
+    echo "  # Keep container running but idle" >> /app/entrypoint.sh && \
+    echo "  touch /app/idle.log" >> /app/entrypoint.sh && \
+    echo "  echo \"⏳ Container started in idle mode at \$(date)\" >> /app/idle.log" >> /app/entrypoint.sh && \
+    echo "  tail -f /app/idle.log" >> /app/entrypoint.sh && \
     echo "fi" >> /app/entrypoint.sh && \
-    echo "" >> /app/entrypoint.sh && \
-    echo "# Start cron manually using init.d script (works in containers)" >> /app/entrypoint.sh && \
-    echo "/etc/init.d/cron start 2>/dev/null || cron 2>/dev/null || true" >> /app/entrypoint.sh && \
-    echo "echo \"✅ Cron service started\"" >> /app/entrypoint.sh && \
-    echo "" >> /app/entrypoint.sh && \
-    echo "# Run once immediately" >> /app/entrypoint.sh && \
-    echo "echo \"🚀 Running initial execution...\"" >> /app/entrypoint.sh && \
-    echo "/app/run_scheduled.sh" >> /app/entrypoint.sh && \
-    echo "" >> /app/entrypoint.sh && \
-    echo "# Keep container running" >> /app/entrypoint.sh && \
-    echo "echo \"🔄 Container will remain running for scheduled executions\"" >> /app/entrypoint.sh && \
-    echo "touch /app/cron.log" >> /app/entrypoint.sh && \
-    echo "tail -f /app/cron.log" >> /app/entrypoint.sh && \
     chmod +x /app/entrypoint.sh
 
 # Set the entrypoint
