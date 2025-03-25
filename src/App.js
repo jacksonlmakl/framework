@@ -72,7 +72,7 @@ const App = () => {
     // "SQL Insert": { icon: <Database className="text-emerald-500" size={20} />, color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
     // "SQL Query": { icon: <FileText className="text-teal-500" size={20} />, color: 'bg-teal-100 text-teal-700 border-teal-200' },
     "SQL": { icon: <Server className="text-violet-500" size={20} />, color: 'bg-violet-100 text-violet-700 border-violet-200' },
-    // "S3 Upload": { icon: <Cloud className="text-amber-500" size={20} />, color: 'bg-amber-100 text-amber-700 border-amber-200' },
+    "S3": { icon: <Cloud className="text-amber-500" size={20} />, color: 'bg-amber-100 text-amber-700 border-amber-200' },
   };
 
   const LoadingOverlay = () => {
