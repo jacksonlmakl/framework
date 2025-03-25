@@ -1162,19 +1162,19 @@ error_behavior: "null"
               <button 
                 onClick={runFlow}
                 disabled={isLoading}
-                className="w-full bg-amber-500 text-white px-4 py-3 rounded-lg hover:bg-amber-600 flex items-center justify-center disabled:opacity-50 transition-colors shadow-sm"
+                className="w-full bg-emerald-500 text-white px-4 py-3 rounded-lg hover:bg-amber-600 flex items-center justify-center disabled:opacity-50 transition-colors shadow-sm"
               >
                 <Play size={18} className="mr-2" />
-                Test Workflow
+                Run
               </button>
               
               <button 
                 onClick={deployFlow}
                 disabled={isLoading}
-                className="w-full bg-emerald-500 text-white px-4 py-3 rounded-lg hover:bg-emerald-600 flex items-center justify-center disabled:opacity-50 transition-colors shadow-sm"
+                className="w-full bg-blue-500 text-white px-4 py-3 rounded-lg hover:bg-emerald-600 flex items-center justify-center disabled:opacity-50 transition-colors shadow-sm"
               >
                 <Upload size={18} className="mr-2" />
-                Deploy & Start
+                Containerize & Schedule
               </button>
               
               <button 
