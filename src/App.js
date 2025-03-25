@@ -189,7 +189,7 @@ const App = () => {
           let type = "Python"; // Default type
           
           if (execute === "s3") {
-            type = "S3 Upload";
+            type = "S3";
           } else if (table && execute.endsWith(".json")) {
             type = "SQL Insert";
           } else if (table && execute.endsWith(".sql")) {
@@ -508,14 +508,14 @@ const App = () => {
             {step.type === "SQL Insert" && <Database size={24} className="text-emerald-600" />}
             {step.type === "SQL Query" && <FileText size={24} className="text-teal-600" />}
             {step.type === "SQL" && <Server size={24} className="text-violet-600" />}
-            {step.type === "S3 Upload" && <Cloud size={24} className="text-amber-600" />}
+            {step.type === "S3" && <Cloud size={24} className="text-amber-600" />}
           </div>
           
           {/* Step name */}
           <div className="text-center px-2">
             <h3 className="font-medium text-slate-800 dark:text-white truncate max-w-full">{step.name}</h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-full">
-              {step.execute === 's3' ? 'S3 Upload' : step.execute}
+              {step.execute === 's3' ? 'S3' : step.execute}
             </p>
           </div>
         </div>
@@ -645,7 +645,7 @@ error_behavior: "null"
           updatedForm.execute = updatedForm.name.toLowerCase().replace(/\s+/g, '_') + '.sql';
           setFileContent('-- SQL\n\nCREATE TABLE IF NOT EXISTS example_table (\n  id INTEGER PRIMARY KEY,\n  name VARCHAR,\n  created_at TIMESTAMP\n);\n');
         }
-      } else if (newType === "S3 Upload") {
+      } else if (newType === "S3") {
         delete updatedForm.table;
         delete updatedForm.database;
         updatedForm.execute = "s3";
@@ -774,7 +774,7 @@ error_behavior: "null"
                     <option value="Python">Python</option>
 
                     <option value="SQL">SQL</option>
-                    <option value="S3 Upload">S3 Upload</option>
+                    <option value="S3">S3</option>
                   </select>
                 </div>
                 
@@ -834,7 +834,7 @@ error_behavior: "null"
                     value={formData.execute} 
                     onChange={handleChange}
                     className="flex-1 p-2.5 rounded-lg bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    disabled={formData.type === "S3 Upload"}
+                    disabled={formData.type === "S3"}
                   />
                   {formData.execute && formData.execute !== 's3' && (
                     <button
