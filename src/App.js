@@ -195,7 +195,7 @@ const App = () => {
           } else if (table && execute.endsWith(".sql")) {
             type = "SQL Query";
           } else if (database && execute.endsWith(".sql")) {
-            type = "SQL Script";
+            type = "SQL";
           }
           
           return { ...step, type };
@@ -507,7 +507,7 @@ const App = () => {
             {step.type === "Python" && <Code size={24} className="text-indigo-600" />}
             {step.type === "SQL Insert" && <Database size={24} className="text-emerald-600" />}
             {step.type === "SQL Query" && <FileText size={24} className="text-teal-600" />}
-            {step.type === "SQL Script" && <Server size={24} className="text-violet-600" />}
+            {step.type === "SQL" && <Server size={24} className="text-violet-600" />}
             {step.type === "S3 Upload" && <Cloud size={24} className="text-amber-600" />}
           </div>
           
@@ -638,12 +638,12 @@ schema_definition:
 error_behavior: "null"
 `);
         }
-      } else if (newType === "SQL Script") {
+      } else if (newType === "SQL") {
         delete updatedForm.table;
         updatedForm.database = formData.database || 'demo';
         if (!updatedForm.execute || !updatedForm.execute.endsWith('.sql')) {
           updatedForm.execute = updatedForm.name.toLowerCase().replace(/\s+/g, '_') + '.sql';
-          setFileContent('-- SQL Script\n\nCREATE TABLE IF NOT EXISTS example_table (\n  id INTEGER PRIMARY KEY,\n  name VARCHAR,\n  created_at TIMESTAMP\n);\n');
+          setFileContent('-- SQL\n\nCREATE TABLE IF NOT EXISTS example_table (\n  id INTEGER PRIMARY KEY,\n  name VARCHAR,\n  created_at TIMESTAMP\n);\n');
         }
       } else if (newType === "S3 Upload") {
         delete updatedForm.table;
@@ -732,7 +732,7 @@ error_behavior: "null"
                 onClick={() => setActiveTab('file')}
               >
                 {formData.execute.endsWith('.py') ? 'Python Code' : 
-                 formData.execute.endsWith('.sql') ? 'SQL Script' : 
+                 formData.execute.endsWith('.sql') ? 'SQL' : 
                  formData.execute.endsWith('.json') ? 'JSON Data' : 'File Content'}
                 {activeTab === 'file' && (
                   <div className="absolute bottom-0 left-0 w-full h-0.5 bg-indigo-600 dark:bg-indigo-400"></div>
@@ -773,7 +773,7 @@ error_behavior: "null"
                   >
                     <option value="Python">Python</option>
 
-                    <option value="SQL Script">SQL Script</option>
+                    <option value="SQL">SQL</option>
                     <option value="S3 Upload">S3 Upload</option>
                   </select>
                 </div>
@@ -812,7 +812,7 @@ error_behavior: "null"
                 </div>
               )}
               
-              {formData.type === "SQL Script" && (
+              {formData.type === "SQL" && (
                 <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Database</label>
                   <input 
@@ -848,7 +848,7 @@ error_behavior: "null"
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                   {formData.type === "Python" ? "Path to Python (.py) file" : 
                    formData.type === "SQL Insert" ? "Path to JSON (.json) file" : 
-                   formData.type === "SQL Query" || formData.type === "SQL Script" ? "Path to SQL (.sql) file" : 
+                   formData.type === "SQL Query" || formData.type === "SQL" ? "Path to SQL (.sql) file" : 
                    ""}
                 </p>
               </div>
@@ -865,7 +865,7 @@ error_behavior: "null"
                    <FileText className="text-slate-600 mr-2" size={18} />}
                   <h3 className="font-medium text-slate-800 dark:text-white">
                     {formData.execute.endsWith('.py') ? 'Python Script' : 
-                     formData.execute.endsWith('.sql') ? 'SQL Script' : 
+                     formData.execute.endsWith('.sql') ? 'SQL' : 
                      formData.execute.endsWith('.json') ? 'JSON Data' : 'File Content'}
                   </h3>
                 </div>
