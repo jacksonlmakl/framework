@@ -69,8 +69,6 @@ const App = () => {
   // Step type icons and colors
   const stepTypeIcons = {
     "Python": { icon: <Code className="text-blue-500" size={20} />, color: 'bg-blue-100 text-blue-700 border-blue-200' },
-    // "SQL Insert": { icon: <Database className="text-emerald-500" size={20} />, color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
-    // "SQL Query": { icon: <FileText className="text-teal-500" size={20} />, color: 'bg-teal-100 text-teal-700 border-teal-200' },
     "SQL": { icon: <Server className="text-violet-500" size={20} />, color: 'bg-violet-100 text-violet-700 border-violet-200' },
     "S3": { icon: <Cloud className="text-amber-500" size={20} />, color: 'bg-amber-100 text-amber-700 border-amber-200' },
   };
@@ -774,8 +772,7 @@ error_behavior: "null"
                     className="w-full p-2.5 rounded-lg bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   >
                     <option value="Python">Python</option>
-                    // <option value="SQL Insert">SQL Insert</option>
-                    // <option value="SQL Query">SQL Query</option>
+
                     <option value="SQL Script">SQL Script</option>
                     <option value="S3 Upload">S3 Upload</option>
                   </select>
