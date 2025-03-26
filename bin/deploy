@@ -16,17 +16,26 @@ IMAGE_NAME="framework"
 IMAGE_TAG="latest"
 CONTAINER_NAME="framework-scheduler"
 
+# Ensure yq is installed
+if ! command -v yq &> /dev/null; then
+  echo "🔍 yq not found. Installing yq..."
+  apt-get update -qq
+  apt-get install -y -qq python3-pip
+  pip install yq
+fi
+
 # Check if controller.yaml has a non-empty schedule
-if command -v yq &> /dev/null && [ -f "./controller.yaml" ]; then
+if [ -f "./controller.yaml" ]; then
   SCHEDULE=$(yq -r '.schedule // ""' controller.yaml)
   if [ -z "$SCHEDULE" ]; then
     echo "⚠️  No schedule defined in controller.yaml. Exiting to avoid launching an idle container."
     exit 0
   fi
 else
-  echo "❌ Error: controller.yaml not found or yq not installed"
+  echo "❌ Error: controller.yaml not found"
   exit 1
 fi
+
 
 # Function to start Docker daemon inside the container
 start_docker_daemon() {
