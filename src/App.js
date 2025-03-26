@@ -407,7 +407,7 @@ const App = () => {
   };
 
   const viewLogs = () => {
-    executeTerminalCommand('bash bin/docker-logs', 'Logs retrieved successfully');
+    executeTerminalCommand('cat logs/*.log', 'Logs retrieved successfully');
   };
 
   const addStep = () => {
@@ -1168,23 +1168,23 @@ error_behavior: "null"
                 Run
               </button>
               
-              <button 
-                onClick={deployFlow}
-                disabled={isLoading}
-                className="w-full bg-blue-500 text-white px-4 py-3 rounded-lg hover:bg-emerald-600 flex items-center justify-center disabled:opacity-50 transition-colors shadow-sm"
-              >
-                <Upload size={18} className="mr-2" />
-                Containerize & Schedule
-              </button>
+              // <button 
+              //   onClick={deployFlow}
+              //   disabled={isLoading}
+              //   className="w-full bg-blue-500 text-white px-4 py-3 rounded-lg hover:bg-emerald-600 flex items-center justify-center disabled:opacity-50 transition-colors shadow-sm"
+              // >
+              //   <Upload size={18} className="mr-2" />
+              //   Containerize & Schedule
+              // </button>
               
-              <button 
-                onClick={stopFlow}
-                disabled={isLoading}
-                className="w-full bg-rose-500 text-white px-4 py-3 rounded-lg hover:bg-rose-600 flex items-center justify-center disabled:opacity-50 transition-colors shadow-sm"
-              >
-                <X size={18} className="mr-2" />
-                Stop Workflow
-              </button>
+              // <button 
+              //   onClick={stopFlow}
+              //   disabled={isLoading}
+              //   className="w-full bg-rose-500 text-white px-4 py-3 rounded-lg hover:bg-rose-600 flex items-center justify-center disabled:opacity-50 transition-colors shadow-sm"
+              // >
+              //   <X size={18} className="mr-2" />
+              //   Stop Workflow
+              // </button>
               
               <button 
                 onClick={viewLogs}
