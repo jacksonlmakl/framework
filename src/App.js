@@ -31,7 +31,7 @@ import yaml from 'js-yaml';
 const App = () => {
   const [steps, setSteps] = useState([]);
   const [globalConfig, setGlobalConfig] = useState({
-    schedule: '',
+    schedule: '* * * * *',
     s3: {
       name: '',
       access_key: '',
@@ -138,7 +138,7 @@ const App = () => {
         console.log("Creating new controller.yaml file with default structure");
         
         setGlobalConfig({
-          schedule: '',
+          schedule: '* * * * *',
           s3: {
             name: '',
             access_key: '',
@@ -163,7 +163,7 @@ const App = () => {
       console.log("Parsed YAML:", parsedYaml);
       
       // Extract schedule
-      const schedule = parsedYaml.schedule || '';
+      const schedule = parsedYaml.schedule || '* * * * *';
       
       // Extract s3 config
       const s3Config = {
@@ -215,7 +215,7 @@ const App = () => {
       
       // Set defaults on error
       setGlobalConfig({
-        schedule: '',
+        schedule: '* * * * *',
         s3: {
           name: '',
           access_key: '',
@@ -407,7 +407,7 @@ const App = () => {
   };
 
   const viewLogs = () => {
-    executeTerminalCommand('cat logs/*.log', 'Logs retrieved successfully');
+    executeTerminalCommand('bash bin/docker-logs', 'Logs retrieved successfully');
   };
 
   const addStep = () => {
@@ -996,7 +996,21 @@ error_behavior: "null"
           </div>
           
           {/* Form content */}
-
+          <div className="space-y-5 mt-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Schedule (Cron Expression)</label>
+              <div className="flex items-center">
+                <Clock size={18} className="text-slate-400 mr-2" />
+                <input 
+                  type="text" 
+                  name="schedule" 
+                  value={settings.schedule} 
+                  onChange={handleChange}
+                  className="flex-1 p-2.5 rounded-lg bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" 
+                />
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5">Format: "* * * * *" (minute hour day month weekday)</p>
+            </div>
             
             <div className="pt-3 border-t border-slate-200 dark:border-slate-700">
               <h3 className="font-medium text-slate-800 dark:text-white flex items-center mb-3">
@@ -1154,23 +1168,23 @@ error_behavior: "null"
                 Run
               </button>
               
-              // <button 
-              //   onClick={deployFlow}
-              //   disabled={isLoading}
-              //   className="w-full bg-blue-500 text-white px-4 py-3 rounded-lg hover:bg-emerald-600 flex items-center justify-center disabled:opacity-50 transition-colors shadow-sm"
-              // >
-              //   <Upload size={18} className="mr-2" />
-              //   Containerize & Schedule
-              // </button>
+              <button 
+                onClick={deployFlow}
+                disabled={isLoading}
+                className="w-full bg-blue-500 text-white px-4 py-3 rounded-lg hover:bg-emerald-600 flex items-center justify-center disabled:opacity-50 transition-colors shadow-sm"
+              >
+                <Upload size={18} className="mr-2" />
+                Containerize & Schedule
+              </button>
               
-              // <button 
-              //   onClick={stopFlow}
-              //   disabled={isLoading}
-              //   className="w-full bg-rose-500 text-white px-4 py-3 rounded-lg hover:bg-rose-600 flex items-center justify-center disabled:opacity-50 transition-colors shadow-sm"
-              // >
-              //   <X size={18} className="mr-2" />
-              //   Stop Workflow
-              // </button>
+              <button 
+                onClick={stopFlow}
+                disabled={isLoading}
+                className="w-full bg-rose-500 text-white px-4 py-3 rounded-lg hover:bg-rose-600 flex items-center justify-center disabled:opacity-50 transition-colors shadow-sm"
+              >
+                <X size={18} className="mr-2" />
+                Stop Workflow
+              </button>
               
               <button 
                 onClick={viewLogs}
