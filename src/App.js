@@ -31,7 +31,7 @@ import yaml from 'js-yaml';
 const App = () => {
   const [steps, setSteps] = useState([]);
   const [globalConfig, setGlobalConfig] = useState({
-    schedule: '* * * * *',
+    schedule: '',
     s3: {
       name: '',
       access_key: '',
@@ -138,7 +138,7 @@ const App = () => {
         console.log("Creating new controller.yaml file with default structure");
         
         setGlobalConfig({
-          schedule: '* * * * *',
+          schedule: '',
           s3: {
             name: '',
             access_key: '',
@@ -163,7 +163,7 @@ const App = () => {
       console.log("Parsed YAML:", parsedYaml);
       
       // Extract schedule
-      const schedule = parsedYaml.schedule || '* * * * *';
+      const schedule = parsedYaml.schedule || '';
       
       // Extract s3 config
       const s3Config = {
@@ -215,7 +215,7 @@ const App = () => {
       
       // Set defaults on error
       setGlobalConfig({
-        schedule: '* * * * *',
+        schedule: '',
         s3: {
           name: '',
           access_key: '',
