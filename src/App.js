@@ -69,8 +69,7 @@ const App = () => {
   // Step type icons and colors
   const stepTypeIcons = {
     "Python": { icon: <Code className="text-blue-500" size={20} />, color: 'bg-blue-100 text-blue-700 border-blue-200' },
-    "SQL": { icon: <Server className="text-violet-500" size={20} />, color: 'bg-violet-100 text-violet-700 border-violet-200' },
-    "S3": { icon: <Cloud className="text-amber-500" size={20} />, color: 'bg-amber-100 text-amber-700 border-amber-200' },
+    "SQL": { icon: <Server className="text-violet-500" size={20} />, color: 'bg-violet-100 text-violet-700 border-violet-200' }
   };
 
   const LoadingOverlay = () => {
@@ -772,9 +771,7 @@ error_behavior: "null"
                     className="w-full p-2.5 rounded-lg bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   >
                     <option value="Python">Python</option>
-
                     <option value="SQL">SQL</option>
-                    // <option value="S3">S3</option>
                   </select>
                 </div>
                 
