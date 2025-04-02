@@ -1012,13 +1012,13 @@ error_behavior: "null"
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5">Format: "* * * * *" (minute hour day month weekday)</p>
             </div>
             
-            <div style="display: none;" className="pt-3 border-t border-slate-200 dark:border-slate-700">
+            <div style={{display: 'none'}} className="pt-3 border-t border-slate-200 dark:border-slate-700">
               <h3 className="font-medium text-slate-800 dark:text-white flex items-center mb-3">
                 <Cloud size={18} className="text-amber-500 mr-2" />
                 S3 Connection Parameters
               </h3>
               
-              <div style="display: none;" className="space-y-4">
+              <div style={{display: 'none'}} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Bucket Name</label>
                   <input 
@@ -1031,7 +1031,7 @@ error_behavior: "null"
                   />
                 </div>
                 
-                <div style="display: none;">
+                <div style={{display: 'none'}}>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Access Key</label>
                   <input 
                     type="password" 
@@ -1043,7 +1043,7 @@ error_behavior: "null"
                   />
                 </div>
                 
-                <div style="display: none;">
+                <div style={{display: 'none'}}>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Secret Key</label>
                   <input 
                     type="password" 
